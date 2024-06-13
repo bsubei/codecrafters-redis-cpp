@@ -1,3 +1,4 @@
+#include <cassert>
 #include <optional>
 #include <iostream>
 #include <cstdlib>
@@ -67,6 +68,41 @@ void send_to_client(int client_fd, const std::string &message)
   send(client_fd, message.c_str(), message.size(), 0);
 }
 
+class Server
+{
+private:
+  std::optional<int> socket_fd{};
+
+public:
+  Server()
+  {
+    socket_fd = create_server_socket();
+  }
+
+  bool is_ready() const
+  {
+    return socket_fd.has_value();
+  }
+
+  void run()
+  {
+    assert(is_ready());
+    int client_fd = await_client_connection(*socket_fd);
+    // TODO read client's message.
+
+    std::string message{"+PONG\r\n"};
+    send_to_client(client_fd, message);
+  }
+
+  ~Server()
+  {
+    if (socket_fd)
+    {
+      close(*socket_fd);
+    }
+  }
+};
+
 int main(int argc, char **argv)
 {
   // Flush after every std::cout / std::cerr
@@ -76,19 +112,13 @@ int main(int argc, char **argv)
   // You can use print statements as follows for debugging, they'll be visible when running tests.
   std::cout << "Logs from your program will appear here!\n";
 
-  std::optional<int> server_fd = create_server_socket();
-  if (!server_fd)
+  Server server{};
+  if (!server.is_ready())
   {
     return 1;
   }
 
-  int client_fd = await_client_connection(*server_fd);
-  // TODO read client's message.
-
-  std::string message{"+PONG\r\n"};
-  send_to_client(client_fd, message);
-
-  close(*server_fd);
+  server.run();
 
   return 0;
 }
