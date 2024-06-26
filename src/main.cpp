@@ -17,7 +17,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // TODO think about how we can accept adn process multiple client connections using multiple threads.
+    // TODO think about how we can accept and process multiple client connections using multiple threads.
     server.run();
 
     return 0;
