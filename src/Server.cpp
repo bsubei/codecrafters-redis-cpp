@@ -1,6 +1,6 @@
-#include "Server.h"
+#include "Server.hpp"
 
-#include "Command.h"
+#include "Command.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -106,7 +106,7 @@ namespace
         return commands;
       }
       // Convert the buffer to a string.
-      buffer_s.append(buffer, bytes_read);
+      buffer_s.append(buffer, bytes_read); // TODO is this going to reallocate?
       std::cout << "buffer_s: " << buffer_s << "\n";
 
       // Keep looping until we consume all the Commands in between newlines that are in buffer_s.
@@ -135,7 +135,7 @@ namespace
 
     return commands;
   }
-}
+} // anonymous namespace
 
 Server::Server()
 {
@@ -152,6 +152,9 @@ void Server::run()
   assert(is_ready());
   const int client_fd = await_client_connection(*socket_fd);
 
+  // TODO going over the RESP protocol:
+  // https://redis.io/docs/latest/develop/reference/protocol-spec/
+  // TODO only deal with simple request-response model for now.
   auto cmds = read_commands_from_socket(client_fd);
 
   // TODO always respond with PONG for now. Need to change response based on received commands.
