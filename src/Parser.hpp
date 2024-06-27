@@ -1,4 +1,13 @@
+#include <array>
 #include <string>
+#include <variant>
+#include <vector>
+#include <cstring>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 
 namespace RESP
 {
@@ -6,11 +15,22 @@ namespace RESP
     {
     };
 
-    class Parser
+    class ParsingException : public std::exception
     {
-        // This is the terminator for the RESP protocol that separates its parts.
-        static constexpr auto TERMINATOR = "\r\n";
+    public:
+        explicit ParsingException(const std::string &message) : message_(message) {}
+
+        virtual const char *what() const noexcept override
+        {
+            return message_.c_str();
+        }
+
+    private:
+        std::string message_;
     };
+
+    // This is the terminator for the RESP protocol that separates its parts.
+    static constexpr auto TERMINATOR = "\r\n";
 
     // See the table of data types in https://redis.io/docs/latest/develop/reference/protocol-spec/#resp-protocol-description
     enum class DataType
@@ -36,35 +56,33 @@ namespace RESP
         Push,
     };
 
-    DataType byte_to_data_type(char first_byte)
+    // Represents the "Request" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
+    struct Request
     {
-        switch (first_byte)
+        // TODO consider using wise_enum to make parsing these commands easier.
+        enum class Command
         {
-        case '+':
-            return DataType::SimpleString;
-        case '-':
-            return DataType::SimpleError;
-        case ':':
-            return DataType::Integer;
-        case '$':
-            return DataType::BulkString;
-        case '*':
-            return DataType::Array;
-        case '_':
-        case ',':
-        case '(':
-        case '!':
-        case '=':
-        case '%':
-        case '~':
-        case '>':
-            throw UnimplementedException{};
-        default:
-            return DataType::Unknown;
-        }
-    }
-    DataType get_type_from_message(const std::string &message)
+            Unknown = 0,
+            Ping = 1,
+
+        };
+        static std::string to_string(Command command);
+
+        static Request parse_request(const std::string &message);
+
+        Request(Command cmd) : command(cmd) {}
+
+        // TODO figure out what else is stored in the Request. Probably the data type and the actual array of commands and arguments.
+        Command command{};
+    };
+    // Represents the "Response" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
+    struct Response
     {
-        return message.size() ? byte_to_data_type(message.front()) : DataType::Unknown;
-    }
+        // TODO for now, just store the response string here, think about what this class should look like.
+        std::string data{};
+    };
+
+    Request parse_request_from_client(const int socket_fd);
+    Response generate_response(const Request &request);
+    std::string response_to_string(const Response &response);
 }

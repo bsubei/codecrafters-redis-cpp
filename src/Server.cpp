@@ -1,6 +1,7 @@
 #include "Server.hpp"
 
 #include "Command.hpp"
+#include "Parser.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -155,6 +156,7 @@ void Server::run()
   // TODO going over the RESP protocol:
   // https://redis.io/docs/latest/develop/reference/protocol-spec/
   // TODO only deal with simple request-response model for now.
+  /*
   auto cmds = read_commands_from_socket(client_fd);
 
   // TODO always respond with PONG for now. Need to change response based on received commands.
@@ -163,6 +165,13 @@ void Server::run()
     const std::string message{"+PONG\r\n"};
     send_to_client(client_fd, message);
   }
+  */
+
+  const auto request = RESP::parse_request_from_client(client_fd);
+  std::cout << "Parsed Request: " << RESP::Request::to_string(request.command) << std::endl;
+  const auto response = RESP::generate_response(request);
+  std::cout << "Generated Response: " << response.data << std::endl;
+  send_to_client(client_fd, RESP::response_to_string(response));
 }
 
 Server::~Server()
