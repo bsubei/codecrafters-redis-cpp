@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 
+#include <string_view>
 #include <iostream>
 
 namespace
@@ -35,10 +36,10 @@ namespace
 
     DataType get_type_from_message(const std::string &message)
     {
-        return message.size() ? byte_to_data_type(message.front()) : DataType::Unknown;
+        return message.size() > 0 ? byte_to_data_type(message.front()) : DataType::Unknown;
     }
 
-    Request::Command parse_command(const std::string &message)
+    Request::Command parse_command(const std::string_view &message)
     {
         if (message == "PING")
         {
@@ -66,8 +67,8 @@ namespace RESP
         const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
 
         const std::string message(buffer.data(), BUFFER_SIZE);
+        std::cout << "Parsing message from client: " << message << std::endl;
 
-        std::cout << "RECEIVED MESSAGE: " << message << std::endl;
         return Request::parse_request(message);
     }
 
@@ -90,32 +91,46 @@ namespace RESP
 
     Request Request::parse_request(const std::string &message)
     {
+        // TODO eventually use the length in the header to efficiently read.
         // Based on the data type, actually parse the message into a Request.
         const auto data_type = get_type_from_message(message);
-        // No arguments expected, just a single string.
+        std::string_view message_sv{message};
+        // No arguments expected, just a single string. Example: "+$4\r\nPING\r\n"
         if (data_type == DataType::SimpleString)
         {
-            const auto start = 1; // Skip over the data type first byte.
-            const auto end = message.find(TERMINATOR);
-            if (end != std::string::npos)
+            auto start = 1; // Skip over the data type first byte (the plus sign).
+            auto end = message_sv.find(TERMINATOR);
+            if (end == std::string::npos)
             {
-                // TODO use a string_view to iterate over the parts of the string and extract what we want.
-                // TODO whoops I forgot to parse the length here...
-
-                // TODO parse the length
-                // TODO parse the command
-
-                const auto cmd = parse_command(message);
-                return Request{cmd};
+                throw ParsingException{"Failed to parse body of simple string due to missing terminator: " + std::string{message_sv}};
             }
-            else
-            {
-                throw ParsingException{"Failed to parse request due to missing terminator: " + message};
-            }
+            message_sv = message_sv.substr(start, end - 1);
+            const auto cmd = parse_command(message_sv);
+            return Request{cmd};
         }
-        else
+        else if (data_type == DataType::BulkString)
         {
-            // TODO else if array type
+            // TODO actually handle the bulk string case, the below is incomplete
+
+            auto start = 1; // Skip over the data type first byte (the plus sign).
+            auto end = message_sv.find(TERMINATOR);
+            if (end == std::string::npos)
+            {
+                throw ParsingException{"Failed to parse length part of the header due to missing terminator: " + std::string{message_sv}};
+            }
+
+            // Skip over the CRLF to the body of the message.
+            start = end + 2;
+            message_sv = message_sv.substr(start);
+            end = message_sv.find(TERMINATOR);
+            if (end == std::string::npos)
+            {
+                throw ParsingException{"Failed to parse the body of the message due to missing terminator: " + std::string{message_sv}};
+            }
+
+            message_sv = message_sv.substr(0, end);
+            const auto cmd = parse_command(message_sv);
+            return Request{cmd};
         }
 
         return Request{Command::Unknown};
