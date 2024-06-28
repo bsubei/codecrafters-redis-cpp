@@ -90,16 +90,34 @@ bool Server::is_ready() const
 void Server::run()
 {
   assert(is_ready());
-  const int client_fd = await_client_connection(*socket_fd);
+  while (is_ready())
+  {
+    const int client_fd = await_client_connection(*socket_fd);
 
-  // TODO going over the RESP protocol:
-  // https://redis.io/docs/latest/develop/reference/protocol-spec/
-  // TODO only deal with simple request-response model for now.
-  const auto request = RESP::parse_request_from_client(client_fd);
-  std::cout << "Parsed Request: " << RESP::Request::to_string(request.command) << std::endl;
-  const auto response = RESP::generate_response(request);
-  std::cout << "Generated Response: " << response.data << std::endl;
-  send_to_client(client_fd, RESP::response_to_string(response));
+    // TODO going over the RESP protocol:
+    // https://redis.io/docs/latest/develop/reference/protocol-spec/
+    // TODO only deal with simple request-response model for now.
+    while (true)
+    {
+      const auto request = RESP::parse_request_from_client(client_fd);
+      if (!request)
+      {
+        std::cout << "Closing connection with " << client_fd << std::endl;
+        break;
+      }
+
+      for (const auto &command : request->commands)
+      {
+        std::cout << "Parsed Command: " << RESP::Request::to_string(command) << std::endl;
+      }
+      const auto responses = RESP::generate_responses(*request);
+      for (const auto &response : responses)
+      {
+        std::cout << "Generated Response: " << response.data << std::endl;
+        send_to_client(client_fd, RESP::response_to_string(response));
+      }
+    }
+  }
 }
 
 Server::~Server()

@@ -57,7 +57,7 @@ namespace RESP
 {
 
     // TODO I'm now mixing the server abstraction with the parser.
-    Request parse_request_from_client(const int socket_fd)
+    std::optional<Request> parse_request_from_client(const int socket_fd)
     {
         // TODO assume we only get requests of up to 1024 bytes, not more.
         constexpr auto BUFFER_SIZE = 1024;
@@ -65,6 +65,10 @@ namespace RESP
 
         std::array<char, BUFFER_SIZE> buffer{};
         const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
+        if (num_bytes_read <= 0)
+        {
+            return std::nullopt;
+        }
 
         const std::string message(buffer.data(), BUFFER_SIZE);
         std::cout << "Parsing message from client: " << message << std::endl;
@@ -72,16 +76,25 @@ namespace RESP
         return Request::parse_request(message);
     }
 
-    Response generate_response(const Request &request)
+    std::vector<Response> generate_responses(const Request &request)
     {
-        Response response{};
+        std::vector<Response> responses{};
         // TODO properly do this later
-        if (request.command == Request::Command::Ping)
+        for (const auto &command : request.commands)
         {
-            // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
-            response.data = "+PONG\r\n";
+            if (command == Request::Command::Ping)
+            {
+                // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
+                const auto response_data = "+PONG\r\n";
+                responses.emplace_back(response_data);
+            }
+            else
+            {
+                // TODO just pretend everything's ok, even if we don't understand the command
+                responses.emplace_back("+OK\r\n");
+            }
         }
-        return response;
+        return responses;
     }
 
     std::string response_to_string(const Response &response)
@@ -91,6 +104,7 @@ namespace RESP
 
     Request Request::parse_request(const std::string &message)
     {
+        Request request{};
         // TODO eventually use the length in the header to efficiently read.
         // Based on the data type, actually parse the message into a Request.
         const auto data_type = get_type_from_message(message);
@@ -106,34 +120,48 @@ namespace RESP
             }
             message_sv = message_sv.substr(start, end - 1);
             const auto cmd = parse_command(message_sv);
-            return Request{cmd};
+            request.commands.push_back(cmd);
         }
-        else if (data_type == DataType::BulkString)
+        else if (data_type == DataType::Array)
         {
-            // TODO actually handle the bulk string case, the below is incomplete
-
             auto start = 1; // Skip over the data type first byte (the plus sign).
             auto end = message_sv.find(TERMINATOR);
             if (end == std::string::npos)
             {
-                throw ParsingException{"Failed to parse length part of the header due to missing terminator: " + std::string{message_sv}};
+                throw ParsingException{"Failed to parse the array header due to missing terminator: " + std::string{message_sv}};
             }
 
-            // Skip over the CRLF to the body of the message.
-            start = end + 2;
-            message_sv = message_sv.substr(start);
-            end = message_sv.find(TERMINATOR);
-            if (end == std::string::npos)
+            message_sv = std::string_view{message.data()}.substr(start);
+            const int num_elems = atoi(message_sv.data());
+            for (int i = 0; i < num_elems; ++i)
             {
-                throw ParsingException{"Failed to parse the body of the message due to missing terminator: " + std::string{message_sv}};
-            }
+                // Skip over the CRLF to the body of the message.
+                start = end + 2;
+                if (start < message.size() && byte_to_data_type(message[start]) == DataType::BulkString)
+                {
+                    // Skip over the length header, we don't actually care about reading it.
+                    message_sv = message_sv.substr(start);
+                    end = message_sv.find(TERMINATOR);
+                    if (end == std::string::npos)
+                    {
+                        throw ParsingException{"Failed to parse length part due to missing terminator: " + std::string{message_sv}};
+                    }
+                    start = end + 2;
+                }
 
+                message_sv = message_sv.substr(start);
+                end = message_sv.find(TERMINATOR);
+                if (end == std::string::npos)
+                {
+                    throw ParsingException{"Failed to parse body of message due to missing terminator: " + std::string{message_sv}};
+                }
+            }
             message_sv = message_sv.substr(0, end);
             const auto cmd = parse_command(message_sv);
-            return Request{cmd};
+            request.commands.push_back(cmd);
         }
 
-        return Request{Command::Unknown};
+        return request;
     }
 
     std::string Request::to_string(Request::Command command)
@@ -143,7 +171,8 @@ namespace RESP
         case Request::Command::Ping:
             return "PING";
         default:
-            throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};
+            return "UNKNOWN COMMAND";
+            // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};
         }
     }
 }

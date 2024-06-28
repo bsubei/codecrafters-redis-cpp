@@ -2,6 +2,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <optional>
 #include <cstring>
 #include <unistd.h>
 #include <sys/types.h>
@@ -43,6 +44,7 @@ namespace RESP
         // Also known as binary string.
         // Comes in this format: $<length>\r\n<data>\r\n
         BulkString,
+        // Comes in this format: *<num_elems>\r\n<elem_1>\r\n....<elem_n>\r\n
         Array,
         // The rest of these are RESP3, which we don't implement
         Null,
@@ -70,19 +72,20 @@ namespace RESP
 
         static Request parse_request(const std::string &message);
 
-        Request(Command cmd) : command(cmd) {}
+        // Request(Command cmd) : command(cmd) {}
 
         // TODO figure out what else is stored in the Request. Probably the data type and the actual array of commands and arguments.
-        Command command{};
+        std::vector<Command> commands{};
     };
     // Represents the "Response" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
     struct Response
     {
+        Response(const std::string &data) : data(data) {}
         // TODO for now, just store the response string here, think about what this class should look like.
         std::string data{};
     };
 
-    Request parse_request_from_client(const int socket_fd);
-    Response generate_response(const Request &request);
+    std::optional<Request> parse_request_from_client(const int socket_fd);
+    std::vector<Response> generate_responses(const Request &request);
     std::string response_to_string(const Response &response);
 }
