@@ -75,30 +75,13 @@ namespace
     send(client_fd, message.c_str(), message.size(), 0);
   }
 
-} // anonymous namespace
-
-Server::Server()
-{
-  socket_fd = create_server_socket();
-}
-
-bool Server::is_ready() const
-{
-  return socket_fd.has_value();
-}
-
-void Server::run()
-{
-  assert(is_ready());
-  while (is_ready())
+  void handle_client_connection(const int client_fd)
   {
-    const int client_fd = await_client_connection(*socket_fd);
-
-    // TODO going over the RESP protocol:
-    // https://redis.io/docs/latest/develop/reference/protocol-spec/
-    // TODO only deal with simple request-response model for now.
     while (true)
     {
+      // TODO going over the RESP protocol:
+      // https://redis.io/docs/latest/develop/reference/protocol-spec/
+      // TODO only deal with simple request-response model for now.
       const auto request = RESP::parse_request_from_client(client_fd);
       if (!request)
       {
@@ -118,10 +101,68 @@ void Server::run()
       }
     }
   }
+
+  // Just waits on the future and swallows exceptions (prints them out to cerr).
+  void consume_async_task(std::future<void> &f)
+  {
+    try
+    {
+      // NOTE: because the futures are created with the async launch policy, we can immediately call get() on them and don't have to check their validity or status.
+      f.get();
+    }
+    catch (const std::future_error &future_error)
+    {
+      std::cerr << "Exception from async task: " << future_error.what() << std::endl;
+    }
+  }
+
+} // anonymous namespace
+
+Server::Server()
+{
+  socket_fd = create_server_socket();
+}
+
+bool Server::is_ready() const
+{
+  return socket_fd.has_value();
+}
+
+void Server::run()
+{
+  assert(is_ready());
+  constexpr auto ASYNC_MAX_LIMIT = 100;
+  try
+  {
+    while (is_ready())
+    {
+      // If we've ended up creating too many simultaneous connections, wait until the oldest connection closes.
+      // This makes sure the server doesn't get too swamped with incoming client connections and makes them wait.
+      if (futures.size() >= ASYNC_MAX_LIMIT)
+      {
+        consume_async_task(futures.front());
+        futures.pop_front();
+      }
+
+      // Create a new connection and spawn off an async task to handle this client.
+      const int client_fd = await_client_connection(*socket_fd);
+      futures.push_back(std::async(std::launch::async, handle_client_connection, client_fd));
+    }
+  }
+  catch (const std::exception &server_error)
+  {
+    std::cerr << "Exception thrown while server was handling new incoming client connections: " << server_error.what() << std::endl;
+  }
 }
 
 Server::~Server()
 {
+  // If the server is shutting down, wait for all the client connection tasks to finish up.
+  for (auto &f : futures)
+  {
+    consume_async_task(f);
+  }
+
   if (socket_fd)
   {
     close(*socket_fd);
