@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <exception>
 
 namespace RESP
 {
@@ -66,16 +67,14 @@ namespace RESP
         {
             Unknown = 0,
             Ping = 1,
-
+            Echo = 2,
         };
         static std::string to_string(Command command);
 
         static Request parse_request(const std::string &message);
 
-        // Request(Command cmd) : command(cmd) {}
-
-        // TODO figure out what else is stored in the Request. Probably the data type and the actual array of commands and arguments.
-        std::vector<Command> commands{};
+        Command command{};
+        std::vector<std::string> arguments{};
     };
     // Represents the "Response" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
     struct Response
@@ -86,6 +85,6 @@ namespace RESP
     };
 
     std::optional<Request> parse_request_from_client(const int socket_fd);
-    std::vector<Response> generate_responses(const Request &request);
+    Response generate_response(const Request &request);
     std::string response_to_string(const Response &response);
 }

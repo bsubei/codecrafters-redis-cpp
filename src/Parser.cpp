@@ -1,6 +1,8 @@
 #include "Parser.hpp"
 
+#include <algorithm>
 #include <string_view>
+#include <sstream>
 #include <iostream>
 
 namespace
@@ -41,9 +43,14 @@ namespace
 
     Request::Command parse_command(const std::string_view &message)
     {
+        // TODO handle case insensitivity using casefold or lower.
         if (message == "PING")
         {
             return Request::Command::Ping;
+        }
+        else if (message == "ECHO")
+        {
+            return Request::Command::Echo;
         }
         else
         {
@@ -76,25 +83,28 @@ namespace RESP
         return Request::parse_request(message);
     }
 
-    std::vector<Response> generate_responses(const Request &request)
+    Response generate_response(const Request &request)
     {
-        std::vector<Response> responses{};
         // TODO properly do this later
-        for (const auto &command : request.commands)
+        if (request.command == Request::Command::Ping)
         {
-            if (command == Request::Command::Ping)
-            {
-                // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
-                const auto response_data = "+PONG\r\n";
-                responses.emplace_back(response_data);
-            }
-            else
-            {
-                // TODO just pretend everything's ok, even if we don't understand the command
-                responses.emplace_back("+OK\r\n");
-            }
+            // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
+            return Response{"+PONG\r\n"};
         }
-        return responses;
+        else if (request.command == Request::Command::Echo)
+        {
+            // TODO we assume ECHO always comes with one and only one argument.
+            auto &reply = request.arguments.front();
+            std::stringstream ss;
+            // Reply with bulk string with length header, then the actual string.
+            ss << "$" << std::to_string(reply.size()) << TERMINATOR << reply << TERMINATOR;
+            return Response{ss.str()};
+        }
+        else
+        {
+            // TODO just pretend everything's ok, even if we don't understand the command
+            return Response{"+OK\r\n"};
+        }
     }
 
     std::string response_to_string(const Response &response)
@@ -102,63 +112,116 @@ namespace RESP
         return response.data;
     }
 
+    void move_up_to_terminator(auto &it)
+    {
+        while (*it != '\r')
+            ++it;
+    }
+    void move_past_terminator(auto &it)
+    {
+        move_up_to_terminator(it);
+        // Move past the '\r'
+        ++it;
+        // Move past the '\n'
+        ++it;
+    }
+
+    // Given an iterator starting at a number, parse that number and move the iterator just past the CRLF newline terminator.
+    int parse_num(auto &it)
+    {
+        // From https://redis.io/docs/latest/develop/reference/protocol-spec/#high-performance-parser-for-the-redis-protocol
+        int len = 0;
+        while (*it != '\r')
+        {
+            len = (len * 10) + (*it - '0');
+            ++it;
+        }
+        move_past_terminator(it);
+        return len;
+    }
+
+    // TODO eventually use the length in the header to efficiently read and also correctly handle text with newlines in it.
+    // TODO make this more efficient and avoid creating strings and passing them around
+    std::vector<std::string> parse_tokens(auto &it, const int num_tokens)
+    {
+        std::vector<std::string> tokens{};
+        DataType data_type = byte_to_data_type(*it);
+
+        // Given a message that looks like this: "$4\r\nECHO\r\n$2\r\nhi", parse the ECHO and hi parts. We ignore the length headers.
+        for (int i = 0; i < num_tokens; ++i)
+        {
+            if (data_type == DataType::BulkString)
+            {
+                // If the it points at a bulk string, just ignore the length header.
+                move_past_terminator(it);
+
+                // Now read the actual string.
+                auto terminator_it = it;
+                move_up_to_terminator(terminator_it);
+                tokens.emplace_back(&*it, &*terminator_it);
+                // Move the iterator to the next token.
+                move_past_terminator(it);
+            }
+            else if (data_type == DataType::SimpleString)
+            {
+                // Move past the '+' char.
+                ++it;
+                // Now read the actual string.
+                auto terminator_it = it;
+                move_up_to_terminator(terminator_it);
+                tokens.emplace_back(&*it, &*terminator_it);
+            }
+        }
+
+        return tokens;
+    }
+
+    Request build_request(std::vector<std::string> elements)
+    {
+        Request request{};
+
+        if (elements.size() > 0)
+        {
+            const auto cmd = parse_command(elements.front());
+            request.command = cmd;
+            // Expect the ECHO command to have exactly two arguments.
+            if (cmd == Request::Command::Echo && elements.size() == 2)
+            {
+                request.arguments.push_back(std::move(elements[1]));
+            }
+            else if (cmd == Request::Command::Ping && elements.size() == 2)
+            {
+                request.arguments.push_back(std::move(elements[1]));
+            }
+        }
+
+        return request;
+    }
+
     Request Request::parse_request(const std::string &message)
     {
         Request request{};
-        // TODO eventually use the length in the header to efficiently read.
         // Based on the data type, actually parse the message into a Request.
         const auto data_type = get_type_from_message(message);
         std::string_view message_sv{message};
-        // No arguments expected, just a single string. Example: "+$4\r\nPING\r\n"
+        // No arguments expected, just a single string. Example: "+PING\r\n"
         if (data_type == DataType::SimpleString)
         {
-            auto start = 1; // Skip over the data type first byte (the plus sign).
-            auto end = message_sv.find(TERMINATOR);
-            if (end == std::string::npos)
-            {
-                throw ParsingException{"Failed to parse body of simple string due to missing terminator: " + std::string{message_sv}};
-            }
-            message_sv = message_sv.substr(start, end - 1);
-            const auto cmd = parse_command(message_sv);
-            request.commands.push_back(cmd);
+            // Just parse the one token from the start.
+            auto it = message.cbegin();
+            return build_request(parse_tokens(it, 1));
         }
         else if (data_type == DataType::Array)
         {
-            auto start = 1; // Skip over the data type first byte (the plus sign).
-            auto end = message_sv.find(TERMINATOR);
-            if (end == std::string::npos)
-            {
-                throw ParsingException{"Failed to parse the array header due to missing terminator: " + std::string{message_sv}};
-            }
-
-            message_sv = std::string_view{message.data()}.substr(start);
-            const int num_elems = atoi(message_sv.data());
-            for (int i = 0; i < num_elems; ++i)
-            {
-                // Skip over the CRLF to the body of the message.
-                start = end + 2;
-                if (start < message.size() && byte_to_data_type(message[start]) == DataType::BulkString)
-                {
-                    // Skip over the length header, we don't actually care about reading it.
-                    message_sv = message_sv.substr(start);
-                    end = message_sv.find(TERMINATOR);
-                    if (end == std::string::npos)
-                    {
-                        throw ParsingException{"Failed to parse length part due to missing terminator: " + std::string{message_sv}};
-                    }
-                    start = end + 2;
-                }
-
-                message_sv = message_sv.substr(start);
-                end = message_sv.find(TERMINATOR);
-                if (end == std::string::npos)
-                {
-                    throw ParsingException{"Failed to parse body of message due to missing terminator: " + std::string{message_sv}};
-                }
-            }
-            message_sv = message_sv.substr(0, end);
-            const auto cmd = parse_command(message_sv);
-            request.commands.push_back(cmd);
+            // We start with an incoming message that looks like this: "*2\r\n$4\r\nECHO\r\n$2\r\nhi"
+            // TODO rewrite this mess and use the array length, and each bulk string length header. Stop messing about with newline tokens and string views
+            auto it = message.cbegin() + 1;
+            // Grab the number of elements since this is an Array message. The iter should end up pointing at the actual message.
+            const auto num_tokens = parse_num(it);
+            // Now the remainder of our message looks like this: "$4\r\nECHO\r\n$2\r\nhi"
+            // Parse each of the tokens (e.g. "ECHO" and "hi" in the above example).
+            // Build a Request object out of these string tokens.
+            return build_request(parse_tokens(it, num_tokens));
         }
 
         return request;
@@ -170,6 +233,8 @@ namespace RESP
         {
         case Request::Command::Ping:
             return "PING";
+        case Request::Command::Echo:
+            return "ECHO";
         default:
             return "UNKNOWN COMMAND";
             // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};

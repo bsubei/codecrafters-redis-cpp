@@ -16,4 +16,6 @@ public:
     bool is_ready() const;
 
     void run();
+
+    void cleanup_finished_client_tasks();
 };

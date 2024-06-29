@@ -3,6 +3,8 @@
 #include "Command.hpp"
 #include "Parser.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cassert>
 #include <iostream>
 #include <cstdlib>
@@ -82,6 +84,7 @@ namespace
       // TODO going over the RESP protocol:
       // https://redis.io/docs/latest/develop/reference/protocol-spec/
       // TODO only deal with simple request-response model for now.
+      // TODO we don't support pipelining. So each client sends one request at a time, which results in one response.
       const auto request = RESP::parse_request_from_client(client_fd);
       if (!request)
       {
@@ -89,31 +92,42 @@ namespace
         break;
       }
 
-      for (const auto &command : request->commands)
+      std::cout << "Parsed Command: " << RESP::Request::to_string(request->command) << std::endl;
+      std::cout << "Parsed Arguments: ";
+      for (const auto &arg : request->arguments)
       {
-        std::cout << "Parsed Command: " << RESP::Request::to_string(command) << std::endl;
+        std::cout << arg << " ";
       }
-      const auto responses = RESP::generate_responses(*request);
-      for (const auto &response : responses)
-      {
-        std::cout << "Generated Response: " << response.data << std::endl;
-        send_to_client(client_fd, RESP::response_to_string(response));
-      }
+      std::cout << std::endl;
+      const auto response = RESP::generate_response(*request);
+      std::cout << "Generated Response: " << response.data << std::endl;
+      send_to_client(client_fd, RESP::response_to_string(response));
     }
   }
 
   // Just waits on the future and swallows exceptions (prints them out to cerr).
-  void consume_async_task(std::future<void> &f)
+  void wait_for_async_task(std::future<void> &f)
   {
     try
     {
-      // NOTE: because the futures are created with the async launch policy, we can immediately call get() on them and don't have to check their validity or status.
       f.get();
     }
-    catch (const std::future_error &future_error)
+    catch (const std::exception &future_error)
     {
       std::cerr << "Exception from async task: " << future_error.what() << std::endl;
     }
+  }
+
+  bool is_async_task_done(std::future<void> &f)
+  {
+    using namespace std::chrono_literals;
+    if (f.wait_for(0s) == std::future_status::ready)
+    {
+      wait_for_async_task(f);
+      return true;
+    }
+
+    return false;
   }
 
 } // anonymous namespace
@@ -128,22 +142,44 @@ bool Server::is_ready() const
   return socket_fd.has_value();
 }
 
+void Server::cleanup_finished_client_tasks()
+{
+  const auto new_end = std::remove_if(futures.begin(), futures.end(), [](auto &f)
+                                      { return is_async_task_done(f); });
+  if (new_end != futures.end())
+  {
+    std::cout << "Cleanup resulted in erasing " << futures.end() - new_end << " task(s)!" << std::endl;
+    futures.erase(new_end, futures.end());
+  }
+}
+
 void Server::run()
 {
+  using namespace std::chrono_literals;
   assert(is_ready());
   constexpr auto ASYNC_MAX_LIMIT = 100;
+  constexpr auto CLEANUP_TASKS_DURATION = 1s;
   try
   {
+    auto last_cleanup_time = std::chrono::system_clock::now();
     while (is_ready())
     {
+      // The main server thread should clean up any stale tasks every now and then.
+      if (std::chrono::system_clock::now() - last_cleanup_time > CLEANUP_TASKS_DURATION)
+      {
+        cleanup_finished_client_tasks();
+        last_cleanup_time = std::chrono::system_clock::now();
+      }
+
       // If we've ended up creating too many simultaneous connections, wait until the oldest connection closes.
       // This makes sure the server doesn't get too swamped with incoming client connections and makes them wait.
       if (futures.size() >= ASYNC_MAX_LIMIT)
       {
-        consume_async_task(futures.front());
+        wait_for_async_task(futures.front());
         futures.pop_front();
       }
 
+      // TODO the problem here is that because the main thread blocks on awaiting clients, we're not displaying any exceptions from the async tasks to console until we get another connection.
       // Create a new connection and spawn off an async task to handle this client.
       const int client_fd = await_client_connection(*socket_fd);
       futures.push_back(std::async(std::launch::async, handle_client_connection, client_fd));
@@ -158,9 +194,9 @@ void Server::run()
 Server::~Server()
 {
   // If the server is shutting down, wait for all the client connection tasks to finish up.
-  for (auto &f : futures)
+  while (futures.size() > 0)
   {
-    consume_async_task(f);
+    cleanup_finished_client_tasks();
   }
 
   if (socket_fd)
