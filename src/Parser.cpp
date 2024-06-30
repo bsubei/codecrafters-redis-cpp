@@ -180,14 +180,18 @@ namespace RESP
             const auto &key = request.arguments.front();
             std::cout << "GETTING VALUE FROM CACHE USING KEY: " << key << std::endl;
             const auto value = cache.get(key);
+            std::stringstream ss;
+            // Reply with bulk string with length header, then the actual string.
             if (value.has_value())
             {
-                std::stringstream ss;
-                // Reply with bulk string with length header, then the actual string.
                 ss << "$" << std::to_string(value->size()) << TERMINATOR << *value << TERMINATOR;
-                return Response{ss.str()};
             }
-            // Falls through to default OK response.
+            else
+            {
+                // Respond with "Null bulk string".
+                ss << "$-1\r\n";
+            }
+            return Response{ss.str()};
         }
 
         // TODO just pretend everything's ok, even if we don't understand the command
