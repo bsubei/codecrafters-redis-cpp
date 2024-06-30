@@ -179,7 +179,6 @@ namespace RESP
             // TODO we assume GET always comes with one and only one argument.
             // TODO actually get stuff from the cache
             const auto &key = request.arguments.front();
-            std::cout << "GETTING VALUE FROM CACHE USING KEY: " << key << std::endl;
             const auto value = cache.get(key);
             std::stringstream ss;
             // Reply with bulk string with length header, then the actual string.
@@ -280,6 +279,10 @@ namespace RESP
             return "ping";
         case Request::Command::Echo:
             return "echo";
+        case Request::Command::Set:
+            return "set";
+        case Request::Command::Get:
+            return "get";
         default:
             return "UNKNOWN COMMAND";
             // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};

@@ -82,15 +82,12 @@ namespace
     {
       const auto &key = request.arguments.front();
       const auto &value = request.arguments[1];
-      std::cout << "SETTING KEY: " << key << " to: " << value;
       std::optional<std::chrono::milliseconds> expiry{};
       if (request.arguments.size() == 4 && request.arguments[2] == "px")
       {
         auto num = std::stoi(request.arguments[3]);
         expiry = std::chrono::milliseconds(num);
-        std::cout << " with expiry: " << num << " milliseconds...";
       }
-      std::cout << std::endl;
 
       cache.set(key, value, expiry);
     }
