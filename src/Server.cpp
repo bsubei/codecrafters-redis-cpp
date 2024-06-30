@@ -1,6 +1,5 @@
 #include "Server.hpp"
 
-#include "Command.hpp"
 #include "Parser.hpp"
 
 #include <algorithm>
@@ -77,8 +76,21 @@ namespace
     send(client_fd, message.c_str(), message.size(), 0);
   }
 
-  void handle_client_connection(const int client_fd)
+  void process_request(const RESP::Request &request, Cache &cache)
   {
+    if (request.command == RESP::Request::Command::Set && request.arguments.size() == 2)
+    {
+      const auto &key = request.arguments.front();
+      const auto &value = request.arguments[1];
+      std::cout << "SETTING KEY: " << key << " to: " << value << std::endl;
+      cache.set(key, value);
+    }
+  }
+
+  void handle_client_connection(const int client_fd, Cache &cache)
+  {
+    // For a client, parse each incoming request, process the request, generate a response to the request, and send the response back to the client.
+    // Do this in series, and keep repeating until the client closes the connection.
     while (true)
     {
       // TODO going over the RESP protocol:
@@ -99,7 +111,11 @@ namespace
         std::cout << arg << " ";
       }
       std::cout << std::endl;
-      const auto response = RESP::generate_response(*request);
+
+      std::cout << "Processing request..." << std::endl;
+      process_request(*request, cache);
+
+      const auto response = RESP::generate_response(*request, cache);
       std::cout << "Generated Response: " << response.data << std::endl;
       send_to_client(client_fd, RESP::response_to_string(response));
     }
@@ -134,22 +150,22 @@ namespace
 
 Server::Server()
 {
-  socket_fd = create_server_socket();
+  socket_fd_ = create_server_socket();
 }
 
 bool Server::is_ready() const
 {
-  return socket_fd.has_value();
+  return socket_fd_.has_value();
 }
 
 void Server::cleanup_finished_client_tasks()
 {
-  const auto new_end = std::remove_if(futures.begin(), futures.end(), [](auto &f)
+  const auto new_end = std::remove_if(futures_.begin(), futures_.end(), [](auto &f)
                                       { return is_async_task_done(f); });
-  if (new_end != futures.end())
+  if (new_end != futures_.end())
   {
-    std::cout << "Cleanup resulted in erasing " << futures.end() - new_end << " task(s)!" << std::endl;
-    futures.erase(new_end, futures.end());
+    std::cout << "Cleanup resulted in erasing " << futures_.end() - new_end << " task(s)!" << std::endl;
+    futures_.erase(new_end, futures_.end());
   }
 }
 
@@ -173,16 +189,18 @@ void Server::run()
 
       // If we've ended up creating too many simultaneous connections, wait until the oldest connection closes.
       // This makes sure the server doesn't get too swamped with incoming client connections and makes them wait.
-      if (futures.size() >= ASYNC_MAX_LIMIT)
+      if (futures_.size() >= ASYNC_MAX_LIMIT)
       {
-        wait_for_async_task(futures.front());
-        futures.pop_front();
+        wait_for_async_task(futures_.front());
+        futures_.pop_front();
       }
 
       // TODO the problem here is that because the main thread blocks on awaiting clients, we're not displaying any exceptions from the async tasks to console until we get another connection.
       // Create a new connection and spawn off an async task to handle this client.
-      const int client_fd = await_client_connection(*socket_fd);
-      futures.push_back(std::async(std::launch::async, handle_client_connection, client_fd));
+      // NOTE: we give the task a reference to the cache since the tasks don't own the cache; this server process does instead. The server will be alive as long as any of the tasks.
+      // NOTE: we pass off the cache using std::ref() because otherwise it would attempt to copy the cache (which is a move-only type due to the mutex).
+      const int client_fd = await_client_connection(*socket_fd_);
+      futures_.push_back(std::async(std::launch::async, handle_client_connection, client_fd, std::ref(cache_)));
     }
   }
   catch (const std::exception &server_error)
@@ -194,13 +212,14 @@ void Server::run()
 Server::~Server()
 {
   // If the server is shutting down, wait for all the client connection tasks to finish up.
-  while (futures.size() > 0)
+  // This way, we ensure that the server process is alive as long as all its children tasks.
+  while (futures_.size() > 0)
   {
     cleanup_finished_client_tasks();
   }
 
-  if (socket_fd)
+  if (socket_fd_)
   {
-    close(*socket_fd);
+    close(*socket_fd_);
   }
 }

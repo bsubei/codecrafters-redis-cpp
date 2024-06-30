@@ -11,6 +11,8 @@
 #include <netdb.h>
 #include <exception>
 
+class Cache;
+
 namespace RESP
 {
     class UnimplementedException : public std::exception
@@ -68,6 +70,8 @@ namespace RESP
             Unknown = 0,
             Ping = 1,
             Echo = 2,
+            Set = 3,
+            Get = 4,
         };
         static std::string to_string(Command command);
 
@@ -85,6 +89,6 @@ namespace RESP
     };
 
     std::optional<Request> parse_request_from_client(const int socket_fd);
-    Response generate_response(const Request &request);
+    Response generate_response(const Request &request, Cache &cache);
     std::string response_to_string(const Response &response);
 }

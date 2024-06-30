@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "Cache.hpp"
+
 namespace
 {
     using namespace RESP;
@@ -52,64 +54,18 @@ namespace
         {
             return Request::Command::Echo;
         }
+        else if (message == "GET")
+        {
+            return Request::Command::Get;
+        }
+        else if (message == "SET")
+        {
+            return Request::Command::Set;
+        }
         else
         {
             return Request::Command::Unknown;
         }
-    }
-
-} // anonymous namespace
-
-namespace RESP
-{
-
-    // TODO I'm now mixing the server abstraction with the parser.
-    std::optional<Request> parse_request_from_client(const int socket_fd)
-    {
-        // TODO assume we only get requests of up to 1024 bytes, not more.
-        constexpr auto BUFFER_SIZE = 1024;
-        constexpr auto FLAGS = 0;
-
-        std::array<char, BUFFER_SIZE> buffer{};
-        const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
-        if (num_bytes_read <= 0)
-        {
-            return std::nullopt;
-        }
-
-        const std::string message(buffer.data(), BUFFER_SIZE);
-        std::cout << "Parsing message from client: " << message << std::endl;
-
-        return Request::parse_request(message);
-    }
-
-    Response generate_response(const Request &request)
-    {
-        // TODO properly do this later
-        if (request.command == Request::Command::Ping)
-        {
-            // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
-            return Response{"+PONG\r\n"};
-        }
-        else if (request.command == Request::Command::Echo)
-        {
-            // TODO we assume ECHO always comes with one and only one argument.
-            auto &reply = request.arguments.front();
-            std::stringstream ss;
-            // Reply with bulk string with length header, then the actual string.
-            ss << "$" << std::to_string(reply.size()) << TERMINATOR << reply << TERMINATOR;
-            return Response{ss.str()};
-        }
-        else
-        {
-            // TODO just pretend everything's ok, even if we don't understand the command
-            return Response{"+OK\r\n"};
-        }
-    }
-
-    std::string response_to_string(const Response &response)
-    {
-        return response.data;
     }
 
     void move_up_to_terminator(auto &it)
@@ -175,6 +131,73 @@ namespace RESP
 
         return tokens;
     }
+} // anonymous namespace
+
+namespace RESP
+{
+
+    // TODO I'm now mixing the server abstraction with the parser.
+    std::optional<Request> parse_request_from_client(const int socket_fd)
+    {
+        // TODO assume we only get requests of up to 1024 bytes, not more.
+        constexpr auto BUFFER_SIZE = 1024;
+        constexpr auto FLAGS = 0;
+
+        std::array<char, BUFFER_SIZE> buffer{};
+        const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
+        if (num_bytes_read <= 0)
+        {
+            return std::nullopt;
+        }
+
+        const std::string message(buffer.data(), BUFFER_SIZE);
+        std::cout << "Parsing message from client: " << message << std::endl;
+
+        return Request::parse_request(message);
+    }
+
+    Response generate_response(const Request &request, Cache &cache)
+    {
+        // TODO properly do this later
+        if (request.command == Request::Command::Ping)
+        {
+            // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
+            return Response{"+PONG\r\n"};
+        }
+        else if (request.command == Request::Command::Echo && request.arguments.size() == 1)
+        {
+            // TODO we assume ECHO always comes with one and only one argument.
+            const auto &reply = request.arguments.front();
+            std::stringstream ss;
+            // Reply with bulk string with length header, then the actual string.
+            ss << "$" << std::to_string(reply.size()) << TERMINATOR << reply << TERMINATOR;
+            return Response{ss.str()};
+        }
+        else if (request.command == Request::Command::Get && request.arguments.size() == 1)
+        {
+            // TODO we assume GET always comes with one and only one argument.
+            // TODO actually get stuff from the cache
+            const auto &key = request.arguments.front();
+            std::cout << "GETTING VALUE FROM CACHE USING KEY: " << key << std::endl;
+            const auto value = cache.get(key);
+            if (value.has_value())
+            {
+                std::stringstream ss;
+                // Reply with bulk string with length header, then the actual string.
+                ss << "$" << std::to_string(value->size()) << TERMINATOR << *value << TERMINATOR;
+                return Response{ss.str()};
+            }
+            // Falls through to default OK response.
+        }
+
+        // TODO just pretend everything's ok, even if we don't understand the command
+        return Response{"+OK\r\n"};
+    }
+
+    std::string response_to_string(const Response &response)
+    {
+        return response.data;
+    }
 
     Request build_request(std::vector<std::string> elements)
     {
@@ -192,6 +215,15 @@ namespace RESP
             else if (cmd == Request::Command::Ping && elements.size() == 2)
             {
                 request.arguments.push_back(std::move(elements[1]));
+            }
+            else if (cmd == Request::Command::Get && elements.size() == 2)
+            {
+                request.arguments.push_back(std::move(elements[1]));
+            }
+            else if (cmd == Request::Command::Set && elements.size() == 3)
+            {
+                request.arguments.push_back(std::move(elements[1]));
+                request.arguments.push_back(std::move(elements[2]));
             }
         }
 
