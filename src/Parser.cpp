@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "Cache.hpp"
+#include "Utils.hpp"
 
 namespace
 {
@@ -45,20 +46,20 @@ namespace
 
     Request::Command parse_command(const std::string_view &message)
     {
-        // TODO handle case insensitivity using casefold or lower.
-        if (message == "PING")
+        const auto lower = tolower(message);
+        if (lower == "ping")
         {
             return Request::Command::Ping;
         }
-        else if (message == "ECHO")
+        else if (lower == "echo")
         {
             return Request::Command::Echo;
         }
-        else if (message == "GET")
+        else if (lower == "get")
         {
             return Request::Command::Get;
         }
-        else if (message == "SET")
+        else if (lower == "set")
         {
             return Request::Command::Set;
         }
@@ -209,7 +210,7 @@ namespace RESP
 
         if (elements.size() > 0)
         {
-            const auto cmd = parse_command(elements.front());
+            const auto cmd = parse_command(tolower(elements.front()));
             request.command = cmd;
             // Expect the ECHO command to have exactly two arguments.
             if (cmd == Request::Command::Echo && elements.size() == 2)
@@ -224,10 +225,18 @@ namespace RESP
             {
                 request.arguments.push_back(std::move(elements[1]));
             }
-            else if (cmd == Request::Command::Set && elements.size() == 3)
+            else if (cmd == Request::Command::Set && elements.size() >= 3)
             {
+                // Take the Key and Value arguments.
                 request.arguments.push_back(std::move(elements[1]));
                 request.arguments.push_back(std::move(elements[2]));
+                // TODO we assume the Set command only takes these arguments and in this order.
+                // Now also take any expiry arguments and take care of lowercasing the PX/EX arg.
+                if (elements.size() == 5)
+                {
+                    request.arguments.push_back(tolower(elements[3]));
+                    request.arguments.push_back(std::move(elements[4]));
+                }
             }
         }
 
@@ -268,9 +277,9 @@ namespace RESP
         switch (command)
         {
         case Request::Command::Ping:
-            return "PING";
+            return "ping";
         case Request::Command::Echo:
-            return "ECHO";
+            return "echo";
         default:
             return "UNKNOWN COMMAND";
             // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};

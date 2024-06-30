@@ -78,12 +78,21 @@ namespace
 
   void process_request(const RESP::Request &request, Cache &cache)
   {
-    if (request.command == RESP::Request::Command::Set && request.arguments.size() == 2)
+    if (request.command == RESP::Request::Command::Set && request.arguments.size() >= 2)
     {
       const auto &key = request.arguments.front();
       const auto &value = request.arguments[1];
-      std::cout << "SETTING KEY: " << key << " to: " << value << std::endl;
-      cache.set(key, value);
+      std::cout << "SETTING KEY: " << key << " to: " << value;
+      std::optional<std::chrono::milliseconds> expiry{};
+      if (request.arguments.size() == 4 && request.arguments[2] == "px")
+      {
+        auto num = std::stoi(request.arguments[3]);
+        expiry = std::chrono::milliseconds(num);
+        std::cout << " with expiry: " << num << " milliseconds...";
+      }
+      std::cout << std::endl;
+
+      cache.set(key, value, expiry);
     }
   }
 
