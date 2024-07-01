@@ -13,6 +13,9 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 #find_package(asio CONFIG REQUIRED)
 
+# Add the third_party directory to the include path
+include_directories(${CMAKE_SOURCE_DIR}/third_party)
+
 # NOTE: header files are already included since they're in the same dir as the source files.
 add_executable(server ${SOURCE_FILES})
 
