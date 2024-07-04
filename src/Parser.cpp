@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <string_view>
-#include <sstream>
 #include <iostream>
 
 #include "Cache.hpp"
@@ -12,38 +11,6 @@
 namespace
 {
     using namespace RESP;
-    DataType byte_to_data_type(char first_byte)
-    {
-        switch (first_byte)
-        {
-        case '+':
-            return DataType::SimpleString;
-        case '-':
-            return DataType::SimpleError;
-        case ':':
-            return DataType::Integer;
-        case '$':
-            return DataType::BulkString;
-        case '*':
-            return DataType::Array;
-        case '_':
-        case ',':
-        case '(':
-        case '!':
-        case '=':
-        case '%':
-        case '~':
-        case '>':
-            throw UnimplementedException{};
-        default:
-            return DataType::Unknown;
-        }
-    }
-
-    DataType get_type_from_message(const std::string &message)
-    {
-        return message.size() > 0 ? byte_to_data_type(message.front()) : DataType::Unknown;
-    }
 
     Request::Command parse_command(const std::vector<std::string> &elements)
     {
@@ -75,73 +42,62 @@ namespace
         return Request::Command::Unknown;
     }
 
-    void move_up_to_terminator(auto &it)
-    {
-        while (*it != '\r')
-            ++it;
-    }
-    void move_past_terminator(auto &it)
-    {
-        move_up_to_terminator(it);
-        // Move past the '\r'
-        ++it;
-        // Move past the '\n'
-        ++it;
-    }
-
-    // Given an iterator starting at a number, parse that number and move the iterator just past the CRLF newline terminator.
-    int parse_num(auto &it)
-    {
-        // From https://redis.io/docs/latest/develop/reference/protocol-spec/#high-performance-parser-for-the-redis-protocol
-        int len = 0;
-        while (*it != '\r')
-        {
-            len = (len * 10) + (*it - '0');
-            ++it;
-        }
-        move_past_terminator(it);
-        return len;
-    }
-
-    // TODO eventually use the length in the header to efficiently read and also correctly handle text with newlines in it.
-    // TODO make this more efficient and avoid creating strings and passing them around
-    std::vector<std::string> parse_tokens(auto &it, const int num_tokens)
-    {
-        std::vector<std::string> tokens{};
-        DataType data_type = byte_to_data_type(*it);
-
-        // Given a message that looks like this: "$4\r\nECHO\r\n$2\r\nhi", parse the ECHO and hi parts. We ignore the length headers.
-        for (int i = 0; i < num_tokens; ++i)
-        {
-            if (data_type == DataType::BulkString)
-            {
-                // If the it points at a bulk string, just ignore the length header.
-                move_past_terminator(it);
-
-                // Now read the actual string.
-                auto terminator_it = it;
-                move_up_to_terminator(terminator_it);
-                tokens.emplace_back(&*it, &*terminator_it);
-                // Move the iterator to the next token.
-                move_past_terminator(it);
-            }
-            else if (data_type == DataType::SimpleString)
-            {
-                // Move past the '+' char.
-                ++it;
-                // Now read the actual string.
-                auto terminator_it = it;
-                move_up_to_terminator(terminator_it);
-                tokens.emplace_back(&*it, &*terminator_it);
-            }
-        }
-
-        return tokens;
-    }
 } // anonymous namespace
 
 namespace RESP
 {
+
+    std::string Message::to_string() const
+    {
+        std::stringstream ss{};
+        switch (data_type)
+        {
+        case DataType::Array:
+            ss << "*" << std::get<std::vector<Message>>(data).size() << TERMINATOR;
+            for (const auto &elem : std::get<std::vector<Message>>(data))
+            {
+                ss << elem.to_string();
+            }
+            break;
+        case DataType::SimpleString:
+            ss << "+" << std::get<std::string>(data) << TERMINATOR;
+            break;
+        case DataType::BulkString:
+            ss << "$" << std::get<std::string>(data).size() << TERMINATOR << std::get<std::string>(data) << TERMINATOR;
+            break;
+        case DataType::Unknown:
+            // TODO
+            break;
+        }
+        return ss.str();
+    }
+    DataType byte_to_data_type(char first_byte)
+    {
+        switch (first_byte)
+        {
+        case '+':
+            return DataType::SimpleString;
+        case '-':
+            return DataType::SimpleError;
+        case ':':
+            return DataType::Integer;
+        case '$':
+            return DataType::BulkString;
+        case '*':
+            return DataType::Array;
+        case '_':
+        case ',':
+        case '(':
+        case '!':
+        case '=':
+        case '%':
+        case '~':
+        case '>':
+            throw UnimplementedException{};
+        default:
+            return DataType::Unknown;
+        }
+    }
 
     // TODO I'm now mixing the server abstraction with the parser.
     std::optional<Request> parse_request_from_client(const int socket_fd)
@@ -169,8 +125,13 @@ namespace RESP
         if (request.command == Request::Command::Ping)
         {
             // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
+            // return make_message(DataType::SimpleString, "PONG");
+            // return make_message<DataType::SimpleString>("PONG");
+            // return Message<DataType::SimpleString>{.data = "PONG"};
+            auto m = make_message("PONG", DataType::SimpleString);
             return Response{"+PONG\r\n"};
         }
+        /*
         else if (request.command == Request::Command::Echo && request.arguments.size() == 1)
         {
             // TODO we assume ECHO always comes with one and only one argument.
@@ -227,6 +188,7 @@ namespace RESP
             }
             return Response{ss.str()};
         }
+        */
 
         // TODO just pretend everything's ok, even if we don't understand the command
         return Response{"+OK\r\n"};
@@ -285,14 +247,12 @@ namespace RESP
     {
         Request request{};
         // Based on the data type, actually parse the message into a Request.
-        const auto data_type = get_type_from_message(message);
-        std::string_view message_sv{message};
+        const auto data_type = get_type(message);
         // No arguments expected, just a single string. Example: "+PING\r\n"
         if (data_type == DataType::SimpleString)
         {
             // Just parse the one token from the start.
-            auto it = message.cbegin();
-            return build_request(parse_tokens(it, 1));
+            return build_request(parse_string(message, 1));
         }
         else if (data_type == DataType::Array)
         {
@@ -304,7 +264,7 @@ namespace RESP
             // Now the remainder of our message looks like this: "$4\r\nECHO\r\n$2\r\nhi"
             // Parse each of the tokens (e.g. "ECHO" and "hi" in the above example).
             // Build a Request object out of these string tokens.
-            return build_request(parse_tokens(it, num_tokens));
+            return build_request(parse_string(std::string_view(it, message.cend()), num_tokens));
         }
 
         return request;
