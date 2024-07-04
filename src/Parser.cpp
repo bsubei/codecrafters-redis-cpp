@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "Cache.hpp"
+#include "Config.hpp"
 #include "Utils.hpp"
 
 namespace
@@ -44,9 +45,9 @@ namespace
         return message.size() > 0 ? byte_to_data_type(message.front()) : DataType::Unknown;
     }
 
-    Request::Command parse_command(const std::string_view &message)
+    Request::Command parse_command(const std::vector<std::string> &elements)
     {
-        const auto lower = tolower(message);
+        const auto lower = tolower(elements.front());
         if (lower == "ping")
         {
             return Request::Command::Ping;
@@ -63,10 +64,15 @@ namespace
         {
             return Request::Command::Set;
         }
-        else
+        else if (lower == "config")
         {
-            return Request::Command::Unknown;
+            if (elements.size() > 1 && tolower(elements[1]) == "get")
+            {
+                return Request::Command::ConfigGet;
+            }
         }
+
+        return Request::Command::Unknown;
     }
 
     void move_up_to_terminator(auto &it)
@@ -157,9 +163,9 @@ namespace RESP
         return Request::parse_request(message);
     }
 
-    Response generate_response(const Request &request, Cache &cache)
+    Response generate_response(const Request &request, Cache &cache, const Config &config)
     {
-        // TODO properly do this later
+        // TODO properly do this later (make a function that returns a bulk-string or array response).
         if (request.command == Request::Command::Ping)
         {
             // TODO this handles the simple string reply to a simple string Ping, need to handle array request-response.
@@ -193,6 +199,34 @@ namespace RESP
             }
             return Response{ss.str()};
         }
+        else if (request.command == Request::Command::ConfigGet && request.arguments.size() == 1)
+        {
+            const auto &key = request.arguments.front();
+            std::optional<std::string> value{};
+            if (tolower(key) == "dir")
+            {
+                value = config.dir;
+            }
+            else if (tolower(key) == "dbfilename")
+            {
+                value = config.dbfilename;
+            }
+
+            std::stringstream ss;
+            // Reply with array listing the key and value.
+            if (value.has_value())
+            {
+                ss << "*2" << TERMINATOR;
+                ss << "$" << std::to_string(key.size()) << TERMINATOR << key << TERMINATOR;
+                ss << "$" << std::to_string(value->size()) << TERMINATOR << *value << TERMINATOR;
+            }
+            else
+            {
+                // Respond with empty array.
+                ss << "*0\r\n";
+            }
+            return Response{ss.str()};
+        }
 
         // TODO just pretend everything's ok, even if we don't understand the command
         return Response{"+OK\r\n"};
@@ -203,13 +237,13 @@ namespace RESP
         return response.data;
     }
 
-    Request build_request(std::vector<std::string> elements)
+    Request build_request(const std::vector<std::string> &elements)
     {
         Request request{};
 
         if (elements.size() > 0)
         {
-            const auto cmd = parse_command(tolower(elements.front()));
+            const auto cmd = parse_command(elements);
             request.command = cmd;
             // Expect the ECHO command to have exactly two arguments.
             if (cmd == Request::Command::Echo && elements.size() == 2)
@@ -236,6 +270,11 @@ namespace RESP
                     request.arguments.push_back(tolower(elements[3]));
                     request.arguments.push_back(std::move(elements[4]));
                 }
+            }
+            else if (cmd == Request::Command::ConfigGet && elements.size() == 3)
+            {
+                // Example: "CONFIG GET dir"
+                request.arguments.push_back(std::move(elements[2]));
             }
         }
 
@@ -275,6 +314,9 @@ namespace RESP
     {
         switch (command)
         {
+        case Request::Command::Unknown:
+            return "UNKNOWN COMMAND";
+            // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};
         case Request::Command::Ping:
             return "ping";
         case Request::Command::Echo:
@@ -283,9 +325,10 @@ namespace RESP
             return "set";
         case Request::Command::Get:
             return "get";
-        default:
-            return "UNKNOWN COMMAND";
-            // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};
+        case Request::Command::ConfigGet:
+            return "config get";
         }
+        std::cerr << "Unknown Request::Command enum encountered: " << static_cast<int>(command) << std::endl;
+        std::terminate();
     }
 }

@@ -1,9 +1,12 @@
+#pragma once
+
 #include <optional>
 #include <unordered_map>
 #include <future>
 #include <deque>
 
 #include "Cache.hpp"
+#include "Config.hpp"
 
 class Server
 {
@@ -14,8 +17,10 @@ private:
 
     Cache cache_{};
 
+    Config config_{};
+
 public:
-    Server();
+    Server(Config config);
     ~Server();
 
     bool is_ready() const;

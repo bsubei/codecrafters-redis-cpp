@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 #include <string>
 #include <variant>
@@ -11,6 +13,7 @@
 #include <netdb.h>
 #include <exception>
 
+class Config;
 class Cache;
 
 namespace RESP
@@ -72,6 +75,7 @@ namespace RESP
             Echo = 2,
             Set = 3,
             Get = 4,
+            ConfigGet = 5,
         };
         static std::string to_string(Command command);
 
@@ -89,6 +93,6 @@ namespace RESP
     };
 
     std::optional<Request> parse_request_from_client(const int socket_fd);
-    Response generate_response(const Request &request, Cache &cache);
+    Response generate_response(const Request &request, Cache &cache, const Config &config);
     std::string response_to_string(const Response &response);
 }

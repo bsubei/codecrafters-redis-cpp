@@ -93,7 +93,7 @@ namespace
     }
   }
 
-  void handle_client_connection(const int client_fd, Cache &cache)
+  void handle_client_connection(const int client_fd, Cache &cache, const Config &config)
   {
     // For a client, parse each incoming request, process the request, generate a response to the request, and send the response back to the client.
     // Do this in series, and keep repeating until the client closes the connection.
@@ -121,7 +121,7 @@ namespace
       std::cout << "Processing request..." << std::endl;
       process_request(*request, cache);
 
-      const auto response = RESP::generate_response(*request, cache);
+      const auto response = RESP::generate_response(*request, cache, config);
       std::cout << "Generated Response: " << response.data << std::endl;
       send_to_client(client_fd, RESP::response_to_string(response));
     }
@@ -154,9 +154,9 @@ namespace
 
 } // anonymous namespace
 
-Server::Server()
+Server::Server(Config config) : socket_fd_(create_server_socket()), futures_(), cache_(), config_(std::move(config))
 {
-  socket_fd_ = create_server_socket();
+  // TODO open and load dir/dbfilename
 }
 
 bool Server::is_ready() const
@@ -205,8 +205,9 @@ void Server::run()
       // Create a new connection and spawn off an async task to handle this client.
       // NOTE: we give the task a reference to the cache since the tasks don't own the cache; this server process does instead. The server will be alive as long as any of the tasks.
       // NOTE: we pass off the cache using std::ref() because otherwise it would attempt to copy the cache (which is a move-only type due to the mutex).
+      // NOTE: passing the config_ is thread-safe because we never modify it, just read from it.
       const int client_fd = await_client_connection(*socket_fd_);
-      futures_.push_back(std::async(std::launch::async, handle_client_connection, client_fd, std::ref(cache_)));
+      futures_.push_back(std::async(std::launch::async, handle_client_connection, client_fd, std::ref(cache_), std::cref(config_)));
     }
   }
   catch (const std::exception &server_error)
