@@ -50,7 +50,9 @@ int main(int argc, char **argv)
         std::cout << "M3s NOT EQUAL" << std::endl;
     }
 
-    // assert(RESP::make_message(std::vector<RESP::Message>{}, RESP::DataType::Array).to_string() == "*0\r\n" && "invalid empty array");
+    const auto empty = RESP::make_message(std::vector<RESP::Message>{}, RESP::DataType::Array);
+    const auto empty_prime = RESP::Message::from_string(empty.to_string());
+    assert(empty == empty_prime && "invalid empty array");
 
 #ifndef NDEBUG
     std::cout << "DEBUG MODE ON!!!" << std::endl;

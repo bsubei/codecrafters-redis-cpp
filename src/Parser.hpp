@@ -199,13 +199,7 @@ namespace RESP
 
         template <typename T>
         Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
-                                                      data_type(data_type_in)
-        {
-            // Don't allow empty data inputs in Message except for NullBulkString.
-            assert(data_type == DataType::NullBulkString || !std::visit([](auto &&arg)
-                                                                        { return arg.empty(); }, data) &&
-                                                                "Cannot create Message with empty data!");
-        }
+                                                      data_type(data_type_in) {}
 
         bool operator==(const Message &other) const = default;
 
