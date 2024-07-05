@@ -50,6 +50,8 @@ int main(int argc, char **argv)
         std::cout << "M3s NOT EQUAL" << std::endl;
     }
 
+    // assert(RESP::make_message(std::vector<RESP::Message>{}, RESP::DataType::Array).to_string() == "*0\r\n" && "invalid empty array");
+
 #ifndef NDEBUG
     std::cout << "DEBUG MODE ON!!!" << std::endl;
 #endif

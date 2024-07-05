@@ -292,7 +292,7 @@ namespace RESP
                     std::vector<Message>{
                         make_message(key, DataType::BulkString),
                         make_message(*value, DataType::BulkString)},
-                    DataType::BulkString);
+                    DataType::Array);
             }
             // Otherwise, respond with empty array.
             return make_message(std::vector<Message>{}, DataType::Array);
