@@ -1,5 +1,6 @@
 #pragma once
 
+// TODO clean up these headers, way too many
 #include <array>
 #include <algorithm>
 #include <string>
@@ -7,6 +8,7 @@
 #include <vector>
 #include <optional>
 #include <cstring>
+#include <cstdint>
 #include <unistd.h>
 #include <cassert>
 #include <sys/types.h>
