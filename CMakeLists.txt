@@ -36,10 +36,8 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 add_executable(parser_test tests/parser_test.cpp)
 target_link_libraries(parser_test PRIVATE redis_lib GTest::gtest_main)
-#include(GoogleTest)
-#gtest_discover_tests(parser_test)
-# Manually register the test executable
-add_test(NAME parser_test COMMAND parser_test)
+include(GoogleTest)
+gtest_discover_tests(parser_test)
 
 # Define custom target to clean the build directory
 add_custom_target(clean-build
