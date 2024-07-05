@@ -76,8 +76,9 @@ namespace
     send(client_fd, message.c_str(), message.size(), 0);
   }
 
-  void process_request(const RESP::Request &request, Cache &cache)
+  void process_message(const RESP::Message &message, Cache &cache)
   {
+    /*
     if (request.command == RESP::Request::Command::Set && request.arguments.size() >= 2)
     {
       const auto &key = request.arguments.front();
@@ -91,39 +92,29 @@ namespace
 
       cache.set(key, value, expiry);
     }
+    */
   }
 
-  void handle_client_connection(const int client_fd, Cache &cache, const Config &config)
+  void handle_client_connection(const int client_fd, const Config &config, Cache &cache)
   {
     // For a client, parse each incoming request, process the request, generate a response to the request, and send the response back to the client.
     // Do this in series, and keep repeating until the client closes the connection.
     while (true)
     {
-      // TODO going over the RESP protocol:
+      // RESP protocol:
       // https://redis.io/docs/latest/develop/reference/protocol-spec/
       // TODO only deal with simple request-response model for now.
       // TODO we don't support pipelining. So each client sends one request at a time, which results in one response.
-      const auto request = RESP::parse_request_from_client(client_fd);
-      if (!request)
+      const auto request_message = RESP::parse_message_from_client(client_fd);
+      if (!request_message)
       {
         std::cout << "Closing connection with " << client_fd << std::endl;
         break;
       }
 
-      std::cout << "Parsed Command: " << RESP::Request::to_string(request->command) << std::endl;
-      std::cout << "Parsed Arguments: ";
-      for (const auto &arg : request->arguments)
-      {
-        std::cout << arg << " ";
-      }
-      std::cout << std::endl;
-
-      std::cout << "Processing request..." << std::endl;
-      process_request(*request, cache);
-
-      const auto response = RESP::generate_response(*request, cache, config);
-      std::cout << "Generated Response: " << response.data << std::endl;
-      send_to_client(client_fd, RESP::response_to_string(response));
+      const auto response_message = RESP::generate_response_message(*request_message, cache, config);
+      std::cout << "Generated Response: " << response_message.to_string() << std::endl;
+      send_to_client(client_fd, response_message.to_string());
     }
   }
 
@@ -207,7 +198,7 @@ void Server::run()
       // NOTE: we pass off the cache using std::ref() because otherwise it would attempt to copy the cache (which is a move-only type due to the mutex).
       // NOTE: passing the config_ is thread-safe because we never modify it, just read from it.
       const int client_fd = await_client_connection(*socket_fd_);
-      futures_.push_back(std::async(std::launch::async, handle_client_connection, client_fd, std::ref(cache_), std::cref(config_)));
+      futures_.push_back(std::async(std::launch::async, handle_client_connection, client_fd, std::cref(config_), std::ref(cache_)));
     }
   }
   catch (const std::exception &server_error)

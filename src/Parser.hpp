@@ -8,6 +8,7 @@
 #include <optional>
 #include <cstring>
 #include <unistd.h>
+#include <cassert>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -143,6 +144,7 @@ namespace RESP
     template <StringLike StringType>
     std::vector<std::string> parse_string(const StringType &s, const int num_tokens)
     {
+        // TODO probably better to do this with istringstream
         std::vector<std::string> tokens{};
         auto it = s.cbegin();
         DataType data_type = byte_to_data_type(*it);
@@ -181,18 +183,26 @@ namespace RESP
     // messages that contain a mixed array of any Message type. I settled on using a variant and using the
     // DataType member as the thing that tells both which variant of data to use and how to convert to/from
     // a string.
-    class Message
+    struct Message
     {
-    private:
-        std::variant<std::string, std::vector<Message>> data{};
+        // TODO clean up all the annoying std::get<> when we access this variant.
+        using data_variant_t = std::variant<std::string, std::vector<Message>>;
+        data_variant_t data{};
         DataType data_type{};
 
-    public:
         Message() = default;
 
         template <typename T>
-        Message(T &&data, DataType data_type) : data(std::forward<T>(data)),
-                                                data_type(data_type) {}
+        Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
+                                                      data_type(data_type_in)
+        {
+            // TODO Don't allow empty data inputs in Message.
+            // assert(data.size() > 0 && "Cannot create Message with empty data!");
+            // Don't allow empty data inputs in Message.
+            assert(!std::visit([](auto &&arg)
+                               { return arg.empty(); }, data) &&
+                   "Cannot create Message with empty data!");
+        }
 
         bool operator==(const Message &other) const = default;
 
@@ -241,18 +251,9 @@ namespace RESP
         return Message(std::forward<T>(data), data_type);
     }
     // Represents the "Request" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
+    /*
     struct Request
     {
-        // TODO consider using wise_enum to make parsing these commands easier.
-        enum class Command
-        {
-            Unknown = 0,
-            Ping = 1,
-            Echo = 2,
-            Set = 3,
-            Get = 4,
-            ConfigGet = 5,
-        };
         static std::string to_string(Command command);
 
         static Request parse_request(const std::string &message);
@@ -268,8 +269,28 @@ namespace RESP
         // TODO for now, just store the response string here, think about what this class should look like.
         std::string data{};
     };
+    */
 
-    std::optional<Request> parse_request_from_client(const int socket_fd);
-    Response generate_response(const Request &request, Cache &cache, const Config &config);
-    std::string response_to_string(const Response &response);
+    // TODO consider using wise_enum to make parsing these commands easier.
+    enum class CommandVerb : std::uint8_t
+    {
+        Unknown = 0,
+        Ping = 1,
+        Echo = 2,
+        Set = 3,
+        Get = 4,
+        ConfigGet = 5,
+    };
+
+    struct Command
+    {
+        CommandVerb verb{};
+        std::vector<std::string> arguments{};
+
+        static std::string to_string(CommandVerb command);
+    };
+
+    std::optional<Message> parse_message_from_client(const int socket_fd);
+    Message generate_response_message(const Message &request_message, Cache &cache, const Config &config);
+    // std::string response_to_string(const Response &response);
 }
