@@ -11,10 +11,10 @@ cleanup() {
 # Register the cleanup function to be called on EXIT
 trap cleanup EXIT
 
-# Configure the project with the special toolchain file (so we can use the newer compiler we installed so we can use concepts).
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=gcc-10-toolchain.cmake
+# Configure the project
+cmake -B build -S .
 # Build only the test target
-cmake --build build --target parser_test
+cmake --build ./build --target parser_test
 # Switch to build directory but save dir so we can cleanup when done.
 pushd build
 # Run the tests

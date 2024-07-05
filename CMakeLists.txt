@@ -16,14 +16,6 @@ find_package(Threads REQUIRED)
 # Add the third_party directory to the include path
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
-# NOTE: header files are already included since they're in the same dir as the source files.
-add_library(redis_lib ${SOURCE_FILES})
-target_link_libraries(redis_lib PRIVATE Threads::Threads)
-
-# Main executable called "server"
-add_executable(server ${SOURCE_FILES} "src/main.cpp")
-target_link_libraries(server PRIVATE redis_lib)
-
 # GTest library and unit tests
 include(FetchContent)
 FetchContent_Declare(
@@ -32,12 +24,29 @@ FetchContent_Declare(
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
-
 enable_testing()
 add_executable(parser_test tests/parser_test.cpp)
 target_link_libraries(parser_test PRIVATE redis_lib GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(parser_test)
+#find_package(GTest REQUIRED)
+#include_directories(${GTEST_INCLUDE_DIRS})
+
+# TODO turn these on very soon once the other CMake issues are resolved.
+# Add somewhat strict warning flags. This applies to all targets defined after here.
+if(MSVC)
+  #add_compile_options(/W4 /WX)
+else()
+  #add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# NOTE: header files are already included since they're in the same dir as the source files.
+add_library(redis_lib ${SOURCE_FILES})
+target_link_libraries(redis_lib PRIVATE Threads::Threads)
+
+# Main executable called "server"
+add_executable(server ${SOURCE_FILES} "src/main.cpp")
+target_link_libraries(server PRIVATE redis_lib)
 
 # Define custom target to clean the build directory
 add_custom_target(clean-build
