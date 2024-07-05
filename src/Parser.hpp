@@ -57,6 +57,8 @@ namespace RESP
         // Also known as binary string.
         // Comes in this format: $<length>\r\n<data>\r\n
         BulkString,
+        // TODO we currently don't handle reading NullBulkString correctly, only writing it out.
+        NullBulkString,
         // Comes in this format: *<num_elems>\r\n<elem_1>\r\n....<elem_n>\r\n
         Array,
         // The rest of these are RESP3, which we don't implement
@@ -133,6 +135,9 @@ namespace RESP
                 tokens.emplace_back(&*it, terminator_it - it);
                 it = terminator_it;
                 break;
+            default:
+                std::cerr << "Unable to tokenize array for given s: " << s << std::endl;
+                std::terminate();
             }
         }
 
@@ -196,12 +201,10 @@ namespace RESP
         Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
                                                       data_type(data_type_in)
         {
-            // TODO Don't allow empty data inputs in Message.
-            // assert(data.size() > 0 && "Cannot create Message with empty data!");
-            // Don't allow empty data inputs in Message.
-            assert(!std::visit([](auto &&arg)
-                               { return arg.empty(); }, data) &&
-                   "Cannot create Message with empty data!");
+            // Don't allow empty data inputs in Message except for NullBulkString.
+            assert(data_type == DataType::NullBulkString || !std::visit([](auto &&arg)
+                                                                        { return arg.empty(); }, data) &&
+                                                                "Cannot create Message with empty data!");
         }
 
         bool operator==(const Message &other) const = default;

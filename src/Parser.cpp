@@ -149,9 +149,12 @@ namespace RESP
         case DataType::BulkString:
             ss << "$" << std::get<std::string>(data).size() << TERMINATOR << std::get<std::string>(data) << TERMINATOR;
             break;
-        case DataType::Unknown:
-            // TODO
+        case DataType::NullBulkString:
+            ss << "$-1" << TERMINATOR;
             break;
+        case DataType::Unknown:
+            std::cerr << "Trying to stringify a Message with Unknown DataType" << std::endl;
+            std::terminate();
         }
         return ss.str();
     }
@@ -241,49 +244,37 @@ namespace RESP
             if (command->arguments.size() == 1)
             {
                 const auto data_type = DataType::BulkString;
-                std::vector<Message> messages;
                 return make_message(
                     std::vector<Message>{
                         make_message("PONG", data_type),
-                        make_message(command->arguments[0], data_type)},
+                        make_message(command->arguments.front(), data_type)},
                     DataType::Array);
             }
             // Otherwise, reply with the simple string "PONG".
             return make_message("PONG", DataType::SimpleString);
         }
-        /*
-        else if (command == Command::Echo)
+        else if (command->verb == CommandVerb::Echo)
         {
-
-            // TODO we assume ECHO always comes with one and only one argument.
-            const auto &reply = request.arguments.front();
-            std::stringstream ss;
-            // Reply with bulk string with length header, then the actual string.
-            ss << "$" << std::to_string(reply.size()) << TERMINATOR << reply << TERMINATOR;
-            return Response{ss.str()};
+            // TODO we assume ECHO always comes with one and only one argument. We may need to revisit this.
+            return make_message(command->arguments.front(), DataType::BulkString);
         }
-        else if (request.command == Command::Get && request.arguments.size() == 1)
+        else if (command->verb == CommandVerb::Get)
         {
+            // TODO we don't currently handle "*" globs or multiple keys.
             // TODO we assume GET always comes with one and only one argument.
-            // TODO actually get stuff from the cache
-            const auto &key = request.arguments.front();
+            const auto &key = command->arguments.front();
             const auto value = cache.get(key);
-            std::stringstream ss;
-            // Reply with bulk string with length header, then the actual string.
-            if (value.has_value())
+            if (value)
             {
-                ss << "$" << std::to_string(value->size()) << TERMINATOR << *value << TERMINATOR;
+                return make_message(*value, DataType::BulkString);
             }
-            else
-            {
-                // Respond with "Null bulk string".
-                ss << "$-1\r\n";
-            }
-            return Response{ss.str()};
+            // TODO need to handle null bulk string properly
+            return make_message("", DataType::NullBulkString);
         }
-        else if (request.command == Command::ConfigGet && request.arguments.size() == 1)
+        else if (command->verb == CommandVerb::ConfigGet)
         {
-            const auto &key = request.arguments.front();
+            // TODO we don't currently handle "*" globs or multiple keys.
+            const auto &key = command->arguments.front();
             std::optional<std::string> value{};
             if (tolower(key) == "dir")
             {
@@ -294,25 +285,20 @@ namespace RESP
                 value = config.dbfilename;
             }
 
-            std::stringstream ss;
-            // Reply with array listing the key and value.
+            // Reply with array listing the key and value if found.
             if (value.has_value())
             {
-                ss << "*2" << TERMINATOR;
-                ss << "$" << std::to_string(key.size()) << TERMINATOR << key << TERMINATOR;
-                ss << "$" << std::to_string(value->size()) << TERMINATOR << *value << TERMINATOR;
+                return make_message(
+                    std::vector<Message>{
+                        make_message(key, DataType::BulkString),
+                        make_message(*value, DataType::BulkString)},
+                    DataType::BulkString);
             }
-            else
-            {
-                // Respond with empty array.
-                ss << "*0\r\n";
-            }
-            return Response{ss.str()};
+            // Otherwise, respond with empty array.
+            return make_message(std::vector<Message>{}, DataType::Array);
         }
-        */
 
-        // TODO just pretend everything's ok, even if we don't understand the command
-        // return Response{"+OK\r\n"};
+        // Print out an error but reply with "OK".
         std::cerr << "Could not generate a valid response for the given command: " << Command::to_string(command->verb)
                   << ", with args (size " << command->arguments.size() << "): ";
         for (const auto &arg : command->arguments)
