@@ -205,6 +205,7 @@ namespace RESP
 
         std::string to_string() const;
 
+        // TODO update this func to accept string literals so we don't have to create temporary strings just to create a Message.
         template <StringLike StringType>
         static Message from_string(const StringType &s)
         {
@@ -239,6 +240,10 @@ namespace RESP
 
             std::cerr << "Unable to parse Message from string: " << s << std::endl;
             std::terminate();
+        }
+        static Message from_string(const char *s)
+        {
+            return from_string(std::string(s));
         }
     };
 
