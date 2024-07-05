@@ -215,6 +215,8 @@ namespace RESP
         // Respond with "+OK\r\n" if we don't know how to handle this command.
         if (!command)
         {
+            // Print out an error but reply with "OK".
+            std::cerr << "Could not parse command from given reqeust: " << request_message.to_string() << std::endl;
             return Message{"OK", DataType::SimpleString};
         }
 
@@ -223,11 +225,11 @@ namespace RESP
         if (command->verb == CommandVerb::Set)
         {
             const auto &key = command->arguments.front();
-            const auto &value = command->arguments[2];
+            const auto &value = command->arguments[1];
             std::optional<std::chrono::milliseconds> expiry{};
-            if (command->arguments.size() == 4 && command->arguments[3] == "px")
+            if (command->arguments.size() == 4 && command->arguments[2] == "px")
             {
-                auto num = std::stoi(command->arguments[4]);
+                auto num = std::stoi(command->arguments[3]);
                 expiry = std::chrono::milliseconds(num);
             }
 
