@@ -5,17 +5,10 @@
 #include "network.hpp"
 #include "redis_core.hpp"
 
-// TODO clean these includes up
 // System includes.
-#include <algorithm>
-#include <chrono>
 #include <cassert>
+#include <chrono>
 #include <iostream>
-#include <cstdlib>
-#include <string>
-#include <vector>
-#include <cstring>
-#include <unistd.h>
 
 namespace
 {

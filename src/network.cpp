@@ -4,8 +4,8 @@
 // System includes.
 #include <arpa/inet.h>
 #include <array>
-#include <sys/socket.h>
 #include <iostream>
+#include <sys/socket.h>
 
 std::optional<int> create_server_socket()
 {

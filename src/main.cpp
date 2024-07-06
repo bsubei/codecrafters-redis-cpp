@@ -1,8 +1,10 @@
-
+// System includes.
 #include <iostream>
 
+// Other includes.
 #include <CLI11.hpp>
 
+// Our library's header includes.
 #include "config.hpp"
 #include "redis_core.hpp"
 #include "redis_server.hpp"

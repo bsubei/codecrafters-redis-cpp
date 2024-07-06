@@ -1,3 +1,4 @@
+// This source file's own header include.
 #include "cache.hpp"
 
 // TODO clean up any expired cache elements we try to access so we don't waste time checking their expiry next time around.

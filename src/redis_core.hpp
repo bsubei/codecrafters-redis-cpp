@@ -1,23 +1,12 @@
 #pragma once
 
-// TODO clean up these headers, way too many
 // System includes.
-#include <array>
 #include <algorithm>
-#include <string>
-#include <vector>
-#include <optional>
-#include <cstring>
-#include <unistd.h>
-#include <cassert>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <exception>
-#include <sstream>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 // Our library's header includes.
 #include "protocol.hpp"

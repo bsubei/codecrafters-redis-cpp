@@ -1,7 +1,8 @@
+// This source file's own header include.
 #include "redis_core.hpp"
 
+// System includes.
 #include <algorithm>
-#include <string_view>
 #include <iostream>
 
 // Our library's header includes.

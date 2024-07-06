@@ -1,9 +1,10 @@
 #pragma once
 
-#include <string>
+// System includes.
 #include <algorithm>
-#include <concepts>
 #include <cctype>
+#include <concepts>
+#include <string>
 
 template <typename T>
 concept StringLike = requires(T a) {

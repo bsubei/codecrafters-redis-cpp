@@ -8,6 +8,7 @@ This is a an attempt at a C++ implementation of the ["Build Your Own Redis" Chal
 - A pretty recent C++ compiler that supports C++23 is required (what worked for me was g++ version 13 or newer). You need to have your system's default compiler point to this newer compiler (usually `/usr/bin/c++`) if you want vscode or whatever setup you have to work out of the box.
 - cmake (3.29+) and make (4.2.1+)
 - gtest is pulled in from a zip file (see the `CMakeLists.txt` file).
+- `CLI11` (header-only lib) is included as a git submodule in this repository.
 
 ## codecrafters CLI
 The codecrafters CLI is primarily how the program is tested. You can also use the `spawn_redis_server.sh` script to build and run the main executable called `server`.
@@ -35,6 +36,6 @@ I'm doing a rehaul of the parser.
 - [x] turn on compiler warning flags
 - [ ] consider using istringstream instead of using iterators on the chars (also fix the bugs where we dereference end iterators).
 - [ ] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
-- [ ] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
-- [ ] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
-- [ ] remove unnecessary header includes
+- [x] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
+- [x] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
+- [x] remove unnecessary header includes
