@@ -5,6 +5,8 @@ project(redis-starter-cpp)
 # All cpp files, except main.cpp.
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 list(FILTER SOURCE_FILES EXCLUDE REGEX "main\\.cpp$")
+# All cpp files in tests dir.
+file(GLOB_RECURSE TEST_FILES tests/*.cpp)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,10 +27,10 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
-add_executable(parser_test tests/parser_test.cpp)
-target_link_libraries(parser_test PRIVATE redis_lib GTest::gtest_main)
+add_executable(redis_tests ${TEST_FILES})
+target_link_libraries(redis_tests PRIVATE redis_lib GTest::gtest_main)
 include(GoogleTest)
-gtest_discover_tests(parser_test)
+gtest_discover_tests(redis_tests)
 
 # TODO turn these on very soon once the other CMake issues are resolved.
 # Add somewhat strict warning flags. This applies to all targets defined after here.
