@@ -127,47 +127,23 @@ namespace
 
 } // anonymous namespace
 
-std::ostream &operator<<(std::ostream &os, const Message &message)
+std::string message_to_string(const Message &message)
 {
-    os << "Message (data_type: " << static_cast<int>(message.data_type) << ", data: ";
+    std::stringstream ss{};
     switch (message.data_type)
     {
     case DataType::Array:
-    {
-        const auto &messages = std::get<std::vector<Message>>(message.data);
-        os << "vector of size " << messages.size() << ": [\n";
-        for (const auto &m : messages)
+        ss << "*" << std::get<std::vector<Message>>(message.data).size() << TERMINATOR;
+        for (const auto &elem : std::get<std::vector<Message>>(message.data))
         {
-            assert(m.data_type != DataType::Array && "Nested Array messages are not allowed");
-            os << std::get<std::string>(m.data) << ",\n";
-        }
-        os << "\n]";
-        break;
-    }
-    default:
-        os << std::get<std::string>(message.data);
-        break;
-    }
-    os << ")\n";
-    return os;
-}
-std::string Message::to_string() const
-{
-    std::stringstream ss{};
-    switch (data_type)
-    {
-    case DataType::Array:
-        ss << "*" << std::get<std::vector<Message>>(data).size() << TERMINATOR;
-        for (const auto &elem : std::get<std::vector<Message>>(data))
-        {
-            ss << elem.to_string();
+            ss << message_to_string(elem);
         }
         break;
     case DataType::SimpleString:
-        ss << "+" << std::get<std::string>(data) << TERMINATOR;
+        ss << "+" << std::get<std::string>(message.data) << TERMINATOR;
         break;
     case DataType::BulkString:
-        ss << "$" << std::get<std::string>(data).size() << TERMINATOR << std::get<std::string>(data) << TERMINATOR;
+        ss << "$" << std::get<std::string>(message.data).size() << TERMINATOR << std::get<std::string>(message.data) << TERMINATOR;
         break;
     case DataType::NullBulkString:
         ss << "$-1" << TERMINATOR;
@@ -196,7 +172,7 @@ std::optional<Message> parse_message_from_client(const int socket_fd)
     const std::string request(buffer.data(), BUFFER_SIZE);
     std::cout << "Parsing request from client: " << request << std::endl;
 
-    return Message::from_string(request);
+    return message_from_string(request);
 }
 
 Message generate_response_message(const Message &request_message, Cache &cache, const Config &config)
@@ -209,7 +185,7 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
     if (!command)
     {
         // Print out an error but reply with "OK".
-        std::cerr << "Could not parse command from given reqeust: " << request_message.to_string() << std::endl;
+        std::cerr << "Could not parse command from given reqeust: " << message_to_string(request_message) << std::endl;
         return Message{"OK", DataType::SimpleString};
     }
 

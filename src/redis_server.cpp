@@ -38,8 +38,8 @@ namespace
       }
 
       const auto response_message = generate_response_message(*request_message, cache, config);
-      std::cout << "Generated Response: " << response_message.to_string() << std::endl;
-      send_to_client(client_fd, response_message.to_string());
+      std::cout << "Generated Response: " << message_to_string(response_message) << std::endl;
+      send_to_client(client_fd, message_to_string(response_message));
     }
   }
 

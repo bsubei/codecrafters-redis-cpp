@@ -5,7 +5,6 @@
 #include <array>
 #include <algorithm>
 #include <string>
-#include <variant>
 #include <vector>
 #include <optional>
 #include <cstring>
@@ -17,7 +16,6 @@
 #include <netdb.h>
 #include <exception>
 #include <sstream>
-#include <variant>
 #include <iostream>
 #include <utility>
 
@@ -131,76 +129,54 @@ std::vector<std::string> parse_string(const StringType &s, const int num_tokens)
     return tokens;
 }
 
-// Unfortunately, we can't encode the DataType as a template parameter because then we can't have Array
-// messages that contain a mixed array of any Message type. I settled on using a variant and using the
-// DataType member as the thing that tells both which variant of data to use and how to convert to/from
-// a string.
-struct Message
+std::string message_to_string(const Message &message);
+
+// TODO update this func to accept string literals so we don't have to create temporary strings just to create a Message.
+template <StringLike StringType>
+Message message_from_string(const StringType &s)
 {
-    // TODO clean up all the annoying std::get<> when we access this variant.
-    using data_variant_t = std::variant<std::string, std::vector<Message>>;
-    data_variant_t data{};
-    DataType data_type{};
+    // TODO if given string is missing terminators, we do undefined behavior
 
-    Message() = default;
+    // TODO handle case insensitivity
 
-    template <typename T>
-    Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
-                                                  data_type(data_type_in) {}
+    // TODO redo all comments
+    // Based on the data type, actually parse the message into a Request.
+    const auto data_type = get_type(s);
+    std::vector<std::string> tokens{};
 
-    bool operator==(const Message &other) const = default;
-
-    std::string to_string() const;
-    // For displaying in GTEST.
-    friend std::ostream &operator<<(std::ostream &os, const Message &message);
-
-    // TODO update this func to accept string literals so we don't have to create temporary strings just to create a Message.
-    template <StringLike StringType>
-    static Message from_string(const StringType &s)
+    switch (data_type)
     {
-        // TODO if given string is missing terminators, we do undefined behavior
-
-        // TODO handle case insensitivity
-
-        // TODO redo all comments
-        // Based on the data type, actually parse the message into a Request.
-        const auto data_type = get_type(s);
-        std::vector<std::string> tokens{};
-
-        switch (data_type)
-        {
-        case DataType::BulkString:
-        case DataType::SimpleString:
-            tokens = parse_string(s, 1);
-            return Message{tokens.front(), data_type};
-        case DataType::Array:
-        {
-            // We start with an incoming message that looks like this: "*2\r\n$4\r\nECHO\r\n$2\r\nhi"
-            auto it = s.cbegin() + 1;
-            // Grab the number of elements since this is an Array message. The iter should end up pointing at the actual message.
-            // TODO don't need this weird iterator mutating func
-            const auto num_tokens = parse_num(it);
-            // Now the remainder of our message looks like this: "$4\r\nECHO\r\n$2\r\nhi"
-            // Parse each of the tokens (e.g. "ECHO" and "hi" in the above example).
-            const auto tokens = tokenize_array(s, num_tokens);
-            std::vector<Message> message_data{};
-            message_data.reserve(tokens.size());
-            std::transform(tokens.cbegin(), tokens.cend(), std::back_inserter(message_data), [](const auto &token)
-                           { return from_string(token); });
-            return Message(std::move(message_data), data_type);
-        }
-        // TODO might need to eventually handle NullBulkString if we expect clients to send us nils.
-        default:
-            std::cerr << "from_string unimplemented for data_type " << static_cast<int>(data_type) << ", was given string: " << s << std::endl;
-            std::terminate();
-        }
-        std::unreachable();
-    }
-    static Message from_string(const char *s)
+    case DataType::BulkString:
+    case DataType::SimpleString:
+        tokens = parse_string(s, 1);
+        return Message{tokens.front(), data_type};
+    case DataType::Array:
     {
-        return from_string(std::string(s));
+        // We start with an incoming message that looks like this: "*2\r\n$4\r\nECHO\r\n$2\r\nhi"
+        auto it = s.cbegin() + 1;
+        // Grab the number of elements since this is an Array message. The iter should end up pointing at the actual message.
+        // TODO don't need this weird iterator mutating func
+        const auto num_tokens = parse_num(it);
+        // Now the remainder of our message looks like this: "$4\r\nECHO\r\n$2\r\nhi"
+        // Parse each of the tokens (e.g. "ECHO" and "hi" in the above example).
+        const auto tokens = tokenize_array(s, num_tokens);
+        std::vector<Message> message_data{};
+        message_data.reserve(tokens.size());
+        std::transform(tokens.cbegin(), tokens.cend(), std::back_inserter(message_data), [](const auto &token)
+                       { return message_from_string(token); });
+        return Message(std::move(message_data), data_type);
     }
-};
+    // TODO might need to eventually handle NullBulkString if we expect clients to send us nils.
+    default:
+        std::cerr << "message_from_string unimplemented for data_type " << static_cast<int>(data_type) << ", was given string: " << s << std::endl;
+        std::terminate();
+    }
+    std::unreachable();
+}
+inline Message message_from_string(const char *s)
+{
+    return message_from_string(std::string(s));
+}
 
 template <typename T>
 Message make_message(T &&data, DataType data_type)

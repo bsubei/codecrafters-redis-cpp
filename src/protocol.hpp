@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <variant>
 #include <vector>
 
 // Our library's header includes.
@@ -60,4 +61,27 @@ struct Command
 {
     CommandVerb verb{};
     std::vector<std::string> arguments{};
+};
+
+// Unfortunately, we can't encode the DataType as a template parameter because then we can't have Array
+// messages that contain a mixed array of any Message type. I settled on using a variant and using the
+// DataType member as the thing that tells both which variant of data to use and how to convert to/from
+// a string.
+struct Message
+{
+    // TODO clean up all the annoying std::get<> when we access this variant.
+    using data_variant_t = std::variant<std::string, std::vector<Message>>;
+    data_variant_t data{};
+    DataType data_type{};
+
+    Message() = default;
+
+    template <typename T>
+    Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
+                                                  data_type(data_type_in) {}
+
+    bool operator==(const Message &other) const = default;
+
+    // For displaying in GTEST.
+    friend std::ostream &operator<<(std::ostream &os, const Message &message);
 };
