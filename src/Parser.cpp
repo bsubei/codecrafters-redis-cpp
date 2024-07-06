@@ -146,9 +146,11 @@ namespace RESP
                 os << std::get<std::string>(m.data) << ",\n";
             }
             os << "\n]";
+            break;
         }
         default:
             os << std::get<std::string>(message.data);
+            break;
         }
         os << ")\n";
         return os;
@@ -174,7 +176,7 @@ namespace RESP
         case DataType::NullBulkString:
             ss << "$-1" << TERMINATOR;
             break;
-        case DataType::Unknown:
+        default:
             std::cerr << "Trying to stringify a Message with Unknown DataType" << std::endl;
             std::terminate();
         }

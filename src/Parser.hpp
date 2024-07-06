@@ -19,6 +19,7 @@
 #include <sstream>
 #include <variant>
 #include <iostream>
+#include <utility>
 
 #include "Utils.hpp"
 
@@ -229,6 +230,7 @@ namespace RESP
                 tokens = parse_string(s, 1);
                 return Message{tokens.front(), data_type};
             case DataType::Array:
+            {
                 // We start with an incoming message that looks like this: "*2\r\n$4\r\nECHO\r\n$2\r\nhi"
                 auto it = s.cbegin() + 1;
                 // Grab the number of elements since this is an Array message. The iter should end up pointing at the actual message.
@@ -243,9 +245,12 @@ namespace RESP
                                { return from_string(token); });
                 return Message(std::move(message_data), data_type);
             }
-
-            std::cerr << "Unable to parse Message from string: " << s << std::endl;
-            std::terminate();
+            // TODO might need to eventually handle NullBulkString if we expect clients to send us nils.
+            default:
+                std::cerr << "from_string unimplemented for data_type " << static_cast<int>(data_type) << ", was given string: " << s << std::endl;
+                std::terminate();
+            }
+            std::unreachable();
         }
         static Message from_string(const char *s)
         {

@@ -76,25 +76,6 @@ namespace
     send(client_fd, message.c_str(), message.size(), 0);
   }
 
-  void process_message(const RESP::Message &message, Cache &cache)
-  {
-    /*
-    if (request.command == RESP::Request::Command::Set && request.arguments.size() >= 2)
-    {
-      const auto &key = request.arguments.front();
-      const auto &value = request.arguments[1];
-      std::optional<std::chrono::milliseconds> expiry{};
-      if (request.arguments.size() == 4 && request.arguments[2] == "px")
-      {
-        auto num = std::stoi(request.arguments[3]);
-        expiry = std::chrono::milliseconds(num);
-      }
-
-      cache.set(key, value, expiry);
-    }
-    */
-  }
-
   void handle_client_connection(const int client_fd, const Config &config, Cache &cache)
   {
     // For a client, parse each incoming request, process the request, generate a response to the request, and send the response back to the client.

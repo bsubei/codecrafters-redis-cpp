@@ -32,7 +32,7 @@ I'm doing a rehaul of the parser.
 - [x] hook up the new refactored parser parts to the Server and see if it works.
 - [x] get IDE autocomplete to work in tests (having trouble with gtest)
 - [x] fix roundtripping tests
-- [ ] turn on compiler warning flags
+- [x] turn on compiler warning flags
 - [ ] consider using istringstream instead of using iterators on the chars (also fix the bugs where we dereference end iterators).
 - [ ] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
 - [ ] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.

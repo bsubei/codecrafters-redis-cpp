@@ -29,15 +29,13 @@ add_executable(parser_test tests/parser_test.cpp)
 target_link_libraries(parser_test PRIVATE redis_lib GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(parser_test)
-#find_package(GTest REQUIRED)
-#include_directories(${GTEST_INCLUDE_DIRS})
 
 # TODO turn these on very soon once the other CMake issues are resolved.
 # Add somewhat strict warning flags. This applies to all targets defined after here.
 if(MSVC)
-  #add_compile_options(/W4 /WX)
+  add_compile_options(/W4 /WX)
 else()
-  #add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+  add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # NOTE: header files are already included since they're in the same dir as the source files.
