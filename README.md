@@ -37,3 +37,4 @@ I'm doing a rehaul of the parser.
 - [ ] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
 - [ ] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
 - [ ] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
+- [ ] remove unnecessary header includes
