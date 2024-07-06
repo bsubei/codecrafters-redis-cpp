@@ -263,26 +263,6 @@ namespace RESP
     {
         return Message(std::forward<T>(data), data_type);
     }
-    // Represents the "Request" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
-    /*
-    struct Request
-    {
-        static std::string to_string(Command command);
-
-        static Request parse_request(const std::string &message);
-
-        Command command{};
-        std::vector<std::string> arguments{};
-    };
-
-    // Represents the "Response" in RESP's request-response communication model. The client sends a request, and the server responds with a response.
-    struct Response
-    {
-        Response(const std::string &data) : data(data) {}
-        // TODO for now, just store the response string here, think about what this class should look like.
-        std::string data{};
-    };
-    */
 
     // TODO consider using wise_enum to make parsing these commands easier.
     // These are the kinds of commands sent from the client that the server is able to parse and respond to.

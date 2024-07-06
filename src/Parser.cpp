@@ -204,7 +204,8 @@ namespace RESP
         case '%':
         case '~':
         case '>':
-            throw UnimplementedException{};
+            std::cerr << "Unimplemented parsing for data type: " << first_byte << std::endl;
+            std::terminate();
         default:
             return DataType::Unknown;
         }
@@ -339,9 +340,6 @@ namespace RESP
     {
         switch (command)
         {
-        case CommandVerb::Unknown:
-            return "UNKNOWN COMMAND";
-            // throw ParsingException{"Could not parse command: " + std::to_string(static_cast<int>(command))};
         case CommandVerb::Ping:
             return "ping";
         case CommandVerb::Echo:
@@ -352,8 +350,9 @@ namespace RESP
             return "get";
         case CommandVerb::ConfigGet:
             return "config get";
+        default:
+            std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
+            std::terminate();
         }
-        std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
-        std::terminate();
     }
 }
