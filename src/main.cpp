@@ -4,7 +4,7 @@
 #include <CLI11.hpp>
 
 #include "config.hpp"
-#include "parser.hpp"
+#include "redis_core.hpp"
 #include "redis_server.hpp"
 
 int main(int argc, char **argv)

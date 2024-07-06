@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../src/parser.hpp"
+#include "../src/redis_core.hpp"
 
 TEST(MessageTest, MessageToString)
 {

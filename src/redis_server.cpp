@@ -2,8 +2,8 @@
 #include "redis_server.hpp"
 
 // Our library's header includes.
-#include "parser.hpp"
 #include "network.hpp"
+#include "redis_core.hpp"
 
 // TODO clean these includes up
 // System includes.
