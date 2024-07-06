@@ -5,8 +5,8 @@ This is a an attempt at a C++ implementation of the ["Build Your Own Redis" Chal
 
 ## Installation/prerequisites
 
-- g++ version 10 or newer is required (because I use some C++20 concepts for fun). You need to have your system's default compiler point to this newer compiler (usually `/usr/bin/c++`).
-- cmake and make
+- A pretty recent C++ compiler that supports C++23 is required (what worked for me was g++ version 13 or newer). You need to have your system's default compiler point to this newer compiler (usually `/usr/bin/c++`) if you want vscode or whatever setup you have to work out of the box.
+- cmake (3.29+) and make (4.2.1+)
 - gtest is pulled in from a zip file (see the `CMakeLists.txt` file).
 
 ## codecrafters CLI
