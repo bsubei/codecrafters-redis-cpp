@@ -1,6 +1,7 @@
 #pragma once
 
 // TODO clean up these headers, way too many
+// System includes.
 #include <array>
 #include <algorithm>
 #include <string>
@@ -21,6 +22,9 @@
 #include <iostream>
 #include <utility>
 
+// Our library's header includes.
+#include "string_parser.hpp"
+#include "protocol.hpp"
 #include "Utils.hpp"
 
 class Config;
@@ -28,88 +32,7 @@ class Cache;
 
 namespace RESP
 {
-    class UnimplementedException : public std::exception
-    {
-    };
-
-    class ParsingException : public std::exception
-    {
-    public:
-        explicit ParsingException(const std::string &message) : message_(message) {}
-
-        virtual const char *what() const noexcept override
-        {
-            return message_.c_str();
-        }
-
-    private:
-        std::string message_;
-    };
-
-    // This is the terminator for the RESP protocol that separates its parts.
-    static constexpr auto TERMINATOR = "\r\n";
-
-    // See the table of data types in https://redis.io/docs/latest/develop/reference/protocol-spec/#resp-protocol-description
-    enum class DataType
-    {
-        Unknown,
-        // Comes in this format: +<data>\r\n
-        SimpleString,
-        SimpleError,
-        Integer,
-        // Also known as binary string.
-        // Comes in this format: $<length>\r\n<data>\r\n
-        BulkString,
-        // TODO we currently don't handle reading NullBulkString correctly, only writing it out.
-        NullBulkString,
-        // Comes in this format: *<num_elems>\r\n<elem_1>\r\n....<elem_n>\r\n
-        Array,
-        // The rest of these are RESP3, which we don't implement
-        Null,
-        Boolean,
-        Double,
-        BigNumber,
-        BulkError,
-        VerbatimString,
-        Map,
-        Set,
-        Push,
-    };
-
     DataType byte_to_data_type(char first_byte);
-
-    template <StringLike StringType>
-    DataType get_type(const StringType &s)
-    {
-        return s.size() > 0 ? byte_to_data_type(s.front()) : DataType::Unknown;
-    }
-
-    void move_up_to_terminator(auto &it)
-    {
-        while (*it != '\r')
-            ++it;
-    }
-    void move_past_terminator(auto &it)
-    {
-        move_up_to_terminator(it);
-        // Move past the '\r'
-        ++it;
-        // Move past the '\n'
-        ++it;
-    }
-    // Given an iterator starting at a number, parse that number and move the iterator just past the CRLF newline terminator.
-    int parse_num(auto &it)
-    {
-        // From https://redis.io/docs/latest/develop/reference/protocol-spec/#high-performance-parser-for-the-redis-protocol
-        int len = 0;
-        while (*it != '\r')
-        {
-            len = (len * 10) + (*it - '0');
-            ++it;
-        }
-        move_past_terminator(it);
-        return len;
-    }
 
     // Given a string of the Array contents (of size n), break it up into n tokens. We can't simply split by the terminator because some elements are complex (bulk string).
     // Each returned token is the unparsed string. e.g. for an input of "*2\r\n$4\r\nECHO\r\n$2\r\nhi", we return:
@@ -185,6 +108,12 @@ namespace RESP
         }
 
         return tokens;
+    }
+
+    template <StringLike StringType>
+    DataType get_type(const StringType &s)
+    {
+        return s.size() > 0 ? byte_to_data_type(s.front()) : DataType::Unknown;
     }
 
     // Unfortunately, we can't encode the DataType as a template parameter because then we can't have Array
