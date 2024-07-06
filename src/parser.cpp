@@ -156,29 +156,25 @@ std::string message_to_string(const Message &message)
 
 Message generate_response_message(const Command &command, const Config &config, Cache &cache)
 {
-    // Now return the response Message we should reply with.
-    Message response_message{};
-
-    // TODO properly do this later (make a function that returns a bulk-string or array response).
     if (command.verb == CommandVerb::Ping)
     {
         // If PING had an argument, reply with PONG and that argument (as bulk strings).
         if (command.arguments.size() == 1)
         {
             const auto data_type = DataType::BulkString;
-            return make_message(
+            return Message(
                 std::vector<Message>{
-                    make_message("PONG", data_type),
-                    make_message(command.arguments.front(), data_type)},
+                    Message("PONG", data_type),
+                    Message(command.arguments.front(), data_type)},
                 DataType::Array);
         }
         // Otherwise, reply with the simple string "PONG".
-        return make_message("PONG", DataType::SimpleString);
+        return Message("PONG", DataType::SimpleString);
     }
     else if (command.verb == CommandVerb::Echo)
     {
         // TODO we assume ECHO always comes with one and only one argument. We may need to revisit this.
-        return make_message(command.arguments.front(), DataType::BulkString);
+        return Message(command.arguments.front(), DataType::BulkString);
     }
     else if (command.verb == CommandVerb::Get)
     {
@@ -188,10 +184,10 @@ Message generate_response_message(const Command &command, const Config &config, 
         const auto value = cache.get(key);
         if (value)
         {
-            return make_message(*value, DataType::BulkString);
+            return Message(*value, DataType::BulkString);
         }
         // TODO need to handle null bulk string properly
-        return make_message("", DataType::NullBulkString);
+        return Message("", DataType::NullBulkString);
     }
     else if (command.verb == CommandVerb::ConfigGet)
     {
@@ -210,14 +206,14 @@ Message generate_response_message(const Command &command, const Config &config, 
         // Reply with array listing the key and value if found.
         if (value.has_value())
         {
-            return make_message(
+            return Message(
                 std::vector<Message>{
-                    make_message(key, DataType::BulkString),
-                    make_message(*value, DataType::BulkString)},
+                    Message(key, DataType::BulkString),
+                    Message(*value, DataType::BulkString)},
                 DataType::Array);
         }
         // Otherwise, respond with empty array.
-        return make_message(std::vector<Message>{}, DataType::Array);
+        return Message(std::vector<Message>{}, DataType::Array);
     }
 
     // Print out an error but reply with "OK".

@@ -1,6 +1,7 @@
 #pragma once
 
 // System includes.
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -63,10 +64,13 @@ struct Command
     std::vector<std::string> arguments{};
 };
 
-// Unfortunately, we can't encode the DataType as a template parameter because then we can't have Array
-// messages that contain a mixed array of any Message type. I settled on using a variant and using the
-// DataType member as the thing that tells both which variant of data to use and how to convert to/from
-// a string.
+// A Message contains "data" to be interpreted based on the stored "data_type". A Message can be constructed from
+// a string received from a client (e.g. "+PING\r\n"), or is generated as a response to the client.
+// When a Message has data_type of Array, its "data" member is of the vector<Message> variant. That means
+// that a Message can contain a vector of other Messages, but only at one level (i.e. the Messages in this
+// vector cannot themselves be of data_type Array and have a vector<Message> inside of them).
+// When a Message has any other data_type, its "data" is interpreted as a std::string according to the format
+// corresponding to data_type.
 struct Message
 {
     // TODO clean up all the annoying std::get<> when we access this variant.
@@ -74,11 +78,30 @@ struct Message
     data_variant_t data{};
     DataType data_type{};
 
+    // Empty ctor
     Message() = default;
 
+    // Forwarding ctor.
     template <typename T>
     Message(T &&data_in, DataType data_type_in) : data(std::forward<T>(data_in)),
-                                                  data_type(data_type_in) {}
+                                                  data_type(data_type_in)
+    {
+        // TODO this check might make things too slow. Profile this at some point.
+        if (data_type == DataType::Array)
+        {
+            if constexpr (!std::is_convertible_v<std::decay_t<T>, std::vector<Message>>)
+            {
+                assert(false && "Array messages must be initialized with a vector<Message>");
+            }
+        }
+        else
+        {
+            if constexpr (!std::is_convertible_v<std::decay_t<T>, std::string>)
+            {
+                assert(false && "Non-array messages must be initialized with a string");
+            }
+        }
+    }
 
     bool operator==(const Message &other) const = default;
 

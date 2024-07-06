@@ -79,12 +79,6 @@ inline Message message_from_string(const char *s)
     return message_from_string(std::string(s));
 }
 
-template <typename T>
-Message make_message(T &&data, DataType data_type)
-{
-    return Message(std::forward<T>(data), data_type);
-}
-
 Message generate_response_message(const Command &command, const Config &config, Cache &cache);
 
 std::string command_to_string(CommandVerb command);
