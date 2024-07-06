@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../src/Parser.hpp"
+#include "../src/parser.hpp"
 
 TEST(MessageTest, ToString)
 {

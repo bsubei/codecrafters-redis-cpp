@@ -7,7 +7,7 @@
 #include <vector>
 
 // Our library's header includes.
-#include "Utils.hpp"
+#include "utils.hpp"
 
 // This file contains all the types required to work with the Redis serialization protocol specification (RESP).
 // Only RESP 2.0 is supported, 3.0 is explicitly not supported.

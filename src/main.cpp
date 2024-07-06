@@ -1,11 +1,11 @@
-#include "Server.hpp"
 
 #include <iostream>
 
 #include <CLI11.hpp>
 
-#include "Config.hpp"
-#include "Parser.hpp"
+#include "config.hpp"
+#include "parser.hpp"
+#include "redis_server.hpp"
 
 int main(int argc, char **argv)
 {

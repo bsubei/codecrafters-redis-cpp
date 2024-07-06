@@ -24,7 +24,7 @@
 // Our library's header includes.
 #include "protocol.hpp"
 #include "string_parser.hpp"
-#include "Utils.hpp"
+#include "utils.hpp"
 
 class Config;
 class Cache;

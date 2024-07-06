@@ -5,8 +5,8 @@
 #include <future>
 #include <deque>
 
-#include "Cache.hpp"
-#include "Config.hpp"
+#include "cache.hpp"
+#include "config.hpp"
 
 class Server
 {

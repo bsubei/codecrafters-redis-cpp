@@ -1,8 +1,8 @@
 // This source file's own header include.
-#include "Server.hpp"
+#include "redis_server.hpp"
 
 // Our library's header includes.
-#include "Parser.hpp"
+#include "parser.hpp"
 #include "network.hpp"
 
 // TODO clean these includes up
