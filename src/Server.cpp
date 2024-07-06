@@ -84,7 +84,7 @@ namespace
     {
       // RESP protocol:
       // https://redis.io/docs/latest/develop/reference/protocol-spec/
-      // TODO only deal with simple request-response model for now.
+      // We only deal with simple request-response model for now.
       // TODO we don't support pipelining. So each client sends one request at a time, which results in one response.
       const auto request_message = RESP::parse_message_from_client(client_fd);
       if (!request_message)

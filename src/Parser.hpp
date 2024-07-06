@@ -285,6 +285,7 @@ namespace RESP
     */
 
     // TODO consider using wise_enum to make parsing these commands easier.
+    // These are the kinds of commands sent from the client that the server is able to parse and respond to.
     enum class CommandVerb : std::uint8_t
     {
         Unknown = 0,
@@ -295,6 +296,8 @@ namespace RESP
         ConfigGet = 5,
     };
 
+    // A Message sent from the client to the server is parsed into a Command.
+    // This Command is then used by the server to decide what action(s) to take and how to respond to the client.
     struct Command
     {
         CommandVerb verb{};
@@ -303,7 +306,8 @@ namespace RESP
         static std::string to_string(CommandVerb command);
     };
 
+    // Waits to receive data from the given client and returns it as a
+    // Message (or nullopt if the client closes the connection).
     std::optional<Message> parse_message_from_client(const int socket_fd);
     Message generate_response_message(const Message &request_message, Cache &cache, const Config &config);
-    // std::string response_to_string(const Response &response);
 }
