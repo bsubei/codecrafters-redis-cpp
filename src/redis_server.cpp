@@ -20,6 +20,25 @@
 namespace
 {
 
+  void handle_command(const Command &command, Cache &cache)
+  {
+    // Handle any state changes we need to do before replying to the client.
+    // The SET command has the side-effect of updating the given key-value pairs in our cache/db.
+    if (command.verb == CommandVerb::Set)
+    {
+      const auto &key = command.arguments.front();
+      const auto &value = command.arguments[1];
+      std::optional<std::chrono::milliseconds> expiry{};
+      if (command.arguments.size() == 4 && command.arguments[2] == "px")
+      {
+        auto num = std::stoi(command.arguments[3]);
+        expiry = std::chrono::milliseconds(num);
+      }
+
+      cache.set(key, value, expiry);
+    }
+  }
+
   void handle_client_connection(const int client_fd, const Config &config, Cache &cache)
   {
     // For a client, parse each incoming request, process the request, generate a response to the request, and send the response back to the client.
@@ -30,16 +49,34 @@ namespace
       // https://redis.io/docs/latest/develop/reference/protocol-spec/
       // We only deal with simple request-response model for now.
       // TODO we don't support pipelining. So each client sends one request at a time, which results in one response.
-      const auto request_message = parse_message_from_client(client_fd);
-      if (!request_message)
+      const auto request = receive_string_from_client(client_fd);
+      if (!request)
       {
         std::cout << "Closing connection with " << client_fd << std::endl;
         break;
       }
+      std::cout << "Parsing request from client: " << *request << std::endl;
 
-      const auto response_message = generate_response_message(*request_message, cache, config);
-      std::cout << "Generated Response: " << message_to_string(response_message) << std::endl;
-      send_to_client(client_fd, message_to_string(response_message));
+      const auto request_message = message_from_string(*request);
+      std::cout << "Interpreting request as message: " << message_to_string(request_message) << std::endl;
+
+      const auto command = parse_and_validate_command(request_message);
+      Message response_message{};
+      if (!command)
+      {
+        // Print out an error but reply with "OK".
+        std::cerr << "Could not parse command from given request: " << message_to_string(request_message) << std::endl;
+        response_message = Message{"OK", DataType::SimpleString};
+      }
+      else
+      {
+        handle_command(*command, cache);
+        response_message = generate_response_message(*command, config, cache);
+      }
+
+      const auto response = message_to_string(response_message);
+      std::cout << "Sending Response: " << response << std::endl;
+      send_to_client(client_fd, response);
     }
   }
 

@@ -3,6 +3,7 @@
 
 // System includes.
 #include <arpa/inet.h>
+#include <array>
 #include <sys/socket.h>
 #include <iostream>
 
@@ -62,4 +63,20 @@ int await_client_connection(const int server_fd)
 void send_to_client(const int client_fd, const std::string &message)
 {
     send(client_fd, message.c_str(), message.size(), 0);
+}
+
+std::optional<std::string> receive_string_from_client(const int socket_fd)
+{
+    // TODO assume we only get requests of up to 1024 bytes, not more.
+    constexpr auto BUFFER_SIZE = 1024;
+    constexpr auto FLAGS = 0;
+
+    std::array<char, BUFFER_SIZE> buffer{};
+    const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
+    if (num_bytes_read <= 0)
+    {
+        return std::nullopt;
+    }
+
+    return std::string(buffer.data(), BUFFER_SIZE);
 }

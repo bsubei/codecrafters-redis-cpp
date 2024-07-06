@@ -11,3 +11,6 @@ int await_client_connection(const int server_fd);
 
 // Sends the given string message over the socket specified by the client file descriptor.
 void send_to_client(const int client_fd, const std::string &message);
+
+// Waits to receive data from the given client and returns it as a string (or nullopt if the client closes the connection).
+std::optional<std::string> receive_string_from_client(const int socket_fd);

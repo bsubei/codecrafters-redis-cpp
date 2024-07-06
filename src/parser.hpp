@@ -129,6 +129,9 @@ std::vector<std::string> parse_string(const StringType &s, const int num_tokens)
     return tokens;
 }
 
+// Figure out what command is being sent to us in the request from the client.
+// This function also makes sure the Message has the correct form (Array type if needed, and number of arguments).
+std::optional<Command> parse_and_validate_command(const Message &message);
 std::string message_to_string(const Message &message);
 
 // TODO update this func to accept string literals so we don't have to create temporary strings just to create a Message.
@@ -184,9 +187,6 @@ Message make_message(T &&data, DataType data_type)
     return Message(std::forward<T>(data), data_type);
 }
 
-// Waits to receive data from the given client and returns it as a
-// Message (or nullopt if the client closes the connection).
-std::optional<Message> parse_message_from_client(const int socket_fd);
-Message generate_response_message(const Message &request_message, Cache &cache, const Config &config);
+Message generate_response_message(const Command &command, const Config &config, Cache& cache);
 
 std::string command_to_string(CommandVerb command);

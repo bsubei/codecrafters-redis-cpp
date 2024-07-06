@@ -40,93 +40,92 @@ namespace
         return message.data_type == DataType::Array;
     }
 
-    // TODO we can probably get away with moving the message when calling this func since it's not used afterwards.
-    std::optional<Command> parse_and_validate_command(const Message &message)
-    {
-        const auto first_elem = tolower(get_first_elem(message));
-        // Two args in the message means the command has one argument.
-        const bool is_array_and_has_two_elements = is_array(message) && std::get<std::vector<Message>>(message.data).size() == 2;
-        if (first_elem == "ping")
-        {
-            // PING can be either a simple string on its own or an Array if an argument is provided.
-            if (is_array_and_has_two_elements)
-            {
-                const auto &arg = std::get<std::vector<Message>>(message.data)[1];
-                assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
-                return Command{CommandVerb::Ping, {std::get<std::string>(arg.data)}};
-            }
-            return Command{CommandVerb::Ping, {}};
-        }
-        else if (first_elem == "echo" && is_array_and_has_two_elements)
-        {
-            // ECHO requires exactly one argument and therefore must be an Array message.
-            if (is_array_and_has_two_elements)
-            {
-                const auto &arg = std::get<std::vector<Message>>(message.data)[1];
-                assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
-                return Command{CommandVerb::Echo, {std::get<std::string>(arg.data)}};
-            }
-        }
-        else if (first_elem == "get" && is_array_and_has_two_elements)
-        {
-            // GET requires exactly one argument and therefore must be an Array message.
-            if (is_array_and_has_two_elements)
-            {
-                const auto &arg = std::get<std::vector<Message>>(message.data)[1];
-                assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
-                return Command{CommandVerb::Get, {std::get<std::string>(arg.data)}};
-            }
-        }
-        else if (first_elem == "set")
-        {
-            // SET must have at least two arguments (the key and value to set).
-            if (is_array(message))
-            {
-                const auto &messages = std::get<std::vector<Message>>(message.data);
-                for (const auto &m : messages)
-                {
-                    assert(m.data_type != DataType::Array && "Nested Array messages are not allowed!");
-                }
-                // The first element is the command, so three elements means we have two arguments to the command.
-                const bool has_at_least_three_elements = messages.size() >= 3;
-                if (has_at_least_three_elements)
-                {
-                    std::vector<std::string> args{};
-                    // Copy the messages (skipping the first) as strings and make them the command arguments.
-                    std::transform(messages.cbegin() + 1, messages.cend(), std::back_inserter(args), [](const auto &m)
-                                   { return std::get<std::string>(m.data); });
-                    return Command{CommandVerb::Set, std::move(args)};
-                }
-            }
-        }
-        else if (first_elem == "config")
-        {
-            // CONFIG GET must provide at least one argument.
-            if (is_array(message))
-            {
-                const auto &messages = std::get<std::vector<Message>>(message.data);
-                for (const auto &m : messages)
-                {
-                    assert(m.data_type != DataType::Array && "Nested Array messages are not allowed!");
-                }
-                // The first two elements make up the command, so three elements means we have one argument to the command.
-                const bool has_at_least_three_elements = std::get<std::vector<Message>>(message.data).size() >= 3;
-                if (has_at_least_three_elements && tolower(std::get<std::string>(messages[1].data)) == "get")
-                {
-                    std::vector<std::string> args{};
-                    // Copy the messages (skipping the first two) as strings and make them the command arguments.
-                    std::transform(messages.cbegin() + 2, messages.cend(), std::back_inserter(args), [](const auto &m)
-                                   { return std::get<std::string>(m.data); });
-                    return Command{CommandVerb::ConfigGet, std::move(args)};
-                }
-            }
-        }
-
-        return std::nullopt;
-    }
-
 } // anonymous namespace
 
+// TODO we can probably get away with moving the message when calling this func since it's not used afterwards.
+std::optional<Command> parse_and_validate_command(const Message &message)
+{
+    const auto first_elem = tolower(get_first_elem(message));
+    // Two args in the message means the command has one argument.
+    const bool is_array_and_has_two_elements = is_array(message) && std::get<std::vector<Message>>(message.data).size() == 2;
+    if (first_elem == "ping")
+    {
+        // PING can be either a simple string on its own or an Array if an argument is provided.
+        if (is_array_and_has_two_elements)
+        {
+            const auto &arg = std::get<std::vector<Message>>(message.data)[1];
+            assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
+            return Command{CommandVerb::Ping, {std::get<std::string>(arg.data)}};
+        }
+        return Command{CommandVerb::Ping, {}};
+    }
+    else if (first_elem == "echo" && is_array_and_has_two_elements)
+    {
+        // ECHO requires exactly one argument and therefore must be an Array message.
+        if (is_array_and_has_two_elements)
+        {
+            const auto &arg = std::get<std::vector<Message>>(message.data)[1];
+            assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
+            return Command{CommandVerb::Echo, {std::get<std::string>(arg.data)}};
+        }
+    }
+    else if (first_elem == "get" && is_array_and_has_two_elements)
+    {
+        // GET requires exactly one argument and therefore must be an Array message.
+        if (is_array_and_has_two_elements)
+        {
+            const auto &arg = std::get<std::vector<Message>>(message.data)[1];
+            assert(arg.data_type != DataType::Array && "Nested Array messages are not allowed!");
+            return Command{CommandVerb::Get, {std::get<std::string>(arg.data)}};
+        }
+    }
+    else if (first_elem == "set")
+    {
+        // SET must have at least two arguments (the key and value to set).
+        if (is_array(message))
+        {
+            const auto &messages = std::get<std::vector<Message>>(message.data);
+            for (const auto &m : messages)
+            {
+                assert(m.data_type != DataType::Array && "Nested Array messages are not allowed!");
+            }
+            // The first element is the command, so three elements means we have two arguments to the command.
+            const bool has_at_least_three_elements = messages.size() >= 3;
+            if (has_at_least_three_elements)
+            {
+                std::vector<std::string> args{};
+                // Copy the messages (skipping the first) as strings and make them the command arguments.
+                std::transform(messages.cbegin() + 1, messages.cend(), std::back_inserter(args), [](const auto &m)
+                               { return std::get<std::string>(m.data); });
+                return Command{CommandVerb::Set, std::move(args)};
+            }
+        }
+    }
+    else if (first_elem == "config")
+    {
+        // CONFIG GET must provide at least one argument.
+        if (is_array(message))
+        {
+            const auto &messages = std::get<std::vector<Message>>(message.data);
+            for (const auto &m : messages)
+            {
+                assert(m.data_type != DataType::Array && "Nested Array messages are not allowed!");
+            }
+            // The first two elements make up the command, so three elements means we have one argument to the command.
+            const bool has_at_least_three_elements = std::get<std::vector<Message>>(message.data).size() >= 3;
+            if (has_at_least_three_elements && tolower(std::get<std::string>(messages[1].data)) == "get")
+            {
+                std::vector<std::string> args{};
+                // Copy the messages (skipping the first two) as strings and make them the command arguments.
+                std::transform(messages.cbegin() + 2, messages.cend(), std::back_inserter(args), [](const auto &m)
+                               { return std::get<std::string>(m.data); });
+                return Command{CommandVerb::ConfigGet, std::move(args)};
+            }
+        }
+    }
+
+    return std::nullopt;
+}
 std::string message_to_string(const Message &message)
 {
     std::stringstream ss{};
@@ -155,85 +154,37 @@ std::string message_to_string(const Message &message)
     return ss.str();
 }
 
-// TODO I'm now mixing the server abstraction with the parser.
-std::optional<Message> parse_message_from_client(const int socket_fd)
+Message generate_response_message(const Command &command, const Config &config, Cache &cache)
 {
-    // TODO assume we only get requests of up to 1024 bytes, not more.
-    constexpr auto BUFFER_SIZE = 1024;
-    constexpr auto FLAGS = 0;
-
-    std::array<char, BUFFER_SIZE> buffer{};
-    const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
-    if (num_bytes_read <= 0)
-    {
-        return std::nullopt;
-    }
-
-    const std::string request(buffer.data(), BUFFER_SIZE);
-    std::cout << "Parsing request from client: " << request << std::endl;
-
-    return message_from_string(request);
-}
-
-Message generate_response_message(const Message &request_message, Cache &cache, const Config &config)
-{
-    // Figure out what command is being sent to us in the request from the client.
-    // This function also makes sure the Message  has the correct form (Array type if needed, and number of arguments).
-    const auto command = parse_and_validate_command(request_message);
-
-    // Respond with "+OK\r\n" if we don't know how to handle this command.
-    if (!command)
-    {
-        // Print out an error but reply with "OK".
-        std::cerr << "Could not parse command from given reqeust: " << message_to_string(request_message) << std::endl;
-        return Message{"OK", DataType::SimpleString};
-    }
-
-    // Handle any state changes we need to do before replying to the client.
-    // The SET command has the side-effect of updating the given key-value pairs in our cache/db.
-    if (command->verb == CommandVerb::Set)
-    {
-        const auto &key = command->arguments.front();
-        const auto &value = command->arguments[1];
-        std::optional<std::chrono::milliseconds> expiry{};
-        if (command->arguments.size() == 4 && command->arguments[2] == "px")
-        {
-            auto num = std::stoi(command->arguments[3]);
-            expiry = std::chrono::milliseconds(num);
-        }
-
-        cache.set(key, value, expiry);
-    }
-
     // Now return the response Message we should reply with.
     Message response_message{};
 
     // TODO properly do this later (make a function that returns a bulk-string or array response).
-    if (command->verb == CommandVerb::Ping)
+    if (command.verb == CommandVerb::Ping)
     {
         // If PING had an argument, reply with PONG and that argument (as bulk strings).
-        if (command->arguments.size() == 1)
+        if (command.arguments.size() == 1)
         {
             const auto data_type = DataType::BulkString;
             return make_message(
                 std::vector<Message>{
                     make_message("PONG", data_type),
-                    make_message(command->arguments.front(), data_type)},
+                    make_message(command.arguments.front(), data_type)},
                 DataType::Array);
         }
         // Otherwise, reply with the simple string "PONG".
         return make_message("PONG", DataType::SimpleString);
     }
-    else if (command->verb == CommandVerb::Echo)
+    else if (command.verb == CommandVerb::Echo)
     {
         // TODO we assume ECHO always comes with one and only one argument. We may need to revisit this.
-        return make_message(command->arguments.front(), DataType::BulkString);
+        return make_message(command.arguments.front(), DataType::BulkString);
     }
-    else if (command->verb == CommandVerb::Get)
+    else if (command.verb == CommandVerb::Get)
     {
         // TODO we don't currently handle "*" globs or multiple keys.
         // TODO we assume GET always comes with one and only one argument.
-        const auto &key = command->arguments.front();
+        const auto &key = command.arguments.front();
         const auto value = cache.get(key);
         if (value)
         {
@@ -242,10 +193,10 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
         // TODO need to handle null bulk string properly
         return make_message("", DataType::NullBulkString);
     }
-    else if (command->verb == CommandVerb::ConfigGet)
+    else if (command.verb == CommandVerb::ConfigGet)
     {
         // TODO we don't currently handle "*" globs or multiple keys.
-        const auto &key = command->arguments.front();
+        const auto &key = command.arguments.front();
         std::optional<std::string> value{};
         if (tolower(key) == "dir")
         {
@@ -270,9 +221,9 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
     }
 
     // Print out an error but reply with "OK".
-    std::cerr << "Could not generate a valid response for the given command: " << command_to_string(command->verb)
-              << ", with args (size " << command->arguments.size() << "): ";
-    for (const auto &arg : command->arguments)
+    std::cerr << "Could not generate a valid response for the given command: " << command_to_string(command.verb)
+              << ", with args (size " << command.arguments.size() << "): ";
+    for (const auto &arg : command.arguments)
     {
         std::cerr << arg;
     }
