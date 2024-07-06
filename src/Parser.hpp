@@ -206,11 +206,15 @@ namespace RESP
         bool operator==(const Message &other) const = default;
 
         std::string to_string() const;
+        // For displaying in GTEST.
+        friend std::ostream &operator<<(std::ostream &os, const Message &message);
 
         // TODO update this func to accept string literals so we don't have to create temporary strings just to create a Message.
         template <StringLike StringType>
         static Message from_string(const StringType &s)
         {
+            // TODO if given string is missing terminators, we do undefined behavior
+
             // TODO handle case insensitivity
 
             // TODO redo all comments

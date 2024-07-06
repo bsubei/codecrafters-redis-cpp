@@ -31,7 +31,7 @@ I'm doing a rehaul of the parser.
 - [x] basic unit tests for parser (can't rely on codecrafters test suite since it doesn't allow testing efactors). Start with roundtripping Messages.
 - [x] hook up the new refactored parser parts to the Server and see if it works.
 - [x] get IDE autocomplete to work in tests (having trouble with gtest)
-- [ ] fix roundtripping tests
+- [x] fix roundtripping tests
 - [ ] turn on compiler warning flags
 - [ ] consider using istringstream instead of using iterators on the chars (also fix the bugs where we dereference end iterators).
 - [ ] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
