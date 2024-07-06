@@ -60,6 +60,4 @@ struct Command
 {
     CommandVerb verb{};
     std::vector<std::string> arguments{};
-
-    static std::string to_string(CommandVerb command);
 };

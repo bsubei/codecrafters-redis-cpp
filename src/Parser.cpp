@@ -294,7 +294,7 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
     }
 
     // Print out an error but reply with "OK".
-    std::cerr << "Could not generate a valid response for the given command: " << Command::to_string(command->verb)
+    std::cerr << "Could not generate a valid response for the given command: " << command_to_string(command->verb)
               << ", with args (size " << command->arguments.size() << "): ";
     for (const auto &arg : command->arguments)
     {
@@ -302,4 +302,24 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
     }
     std::cerr << std::endl;
     return Message{"OK", DataType::SimpleString};
+}
+
+std::string command_to_string(CommandVerb command)
+{
+    switch (command)
+    {
+    case CommandVerb::Ping:
+        return "ping";
+    case CommandVerb::Echo:
+        return "echo";
+    case CommandVerb::Set:
+        return "set";
+    case CommandVerb::Get:
+        return "get";
+    case CommandVerb::ConfigGet:
+        return "config get";
+    default:
+        std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
+        std::terminate();
+    }
 }

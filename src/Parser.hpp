@@ -212,3 +212,5 @@ Message make_message(T &&data, DataType data_type)
 // Message (or nullopt if the client closes the connection).
 std::optional<Message> parse_message_from_client(const int socket_fd);
 Message generate_response_message(const Message &request_message, Cache &cache, const Config &config);
+
+std::string command_to_string(CommandVerb command);
