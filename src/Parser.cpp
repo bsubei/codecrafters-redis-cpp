@@ -178,34 +178,6 @@ std::string Message::to_string() const
     }
     return ss.str();
 }
-DataType byte_to_data_type(char first_byte)
-{
-    switch (first_byte)
-    {
-    case '+':
-        return DataType::SimpleString;
-    case '-':
-        return DataType::SimpleError;
-    case ':':
-        return DataType::Integer;
-    case '$':
-        return DataType::BulkString;
-    case '*':
-        return DataType::Array;
-    case '_':
-    case ',':
-    case '(':
-    case '!':
-    case '=':
-    case '%':
-    case '~':
-    case '>':
-        std::cerr << "Unimplemented parsing for data type: " << first_byte << std::endl;
-        std::terminate();
-    default:
-        return DataType::Unknown;
-    }
-}
 
 // TODO I'm now mixing the server abstraction with the parser.
 std::optional<Message> parse_message_from_client(const int socket_fd)
@@ -330,24 +302,4 @@ Message generate_response_message(const Message &request_message, Cache &cache, 
     }
     std::cerr << std::endl;
     return Message{"OK", DataType::SimpleString};
-}
-
-std::string Command::to_string(CommandVerb command)
-{
-    switch (command)
-    {
-    case CommandVerb::Ping:
-        return "ping";
-    case CommandVerb::Echo:
-        return "echo";
-    case CommandVerb::Set:
-        return "set";
-    case CommandVerb::Get:
-        return "get";
-    case CommandVerb::ConfigGet:
-        return "config get";
-    default:
-        std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
-        std::terminate();
-    }
 }

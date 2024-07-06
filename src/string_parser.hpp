@@ -7,8 +7,6 @@
 // Our library's header includes.
 #include "protocol.hpp"
 #include "Utils.hpp"
-// TODO detangle Parser.hpp
-// #include "Parser.hpp"
 
 void move_up_to_terminator(auto &it)
 {

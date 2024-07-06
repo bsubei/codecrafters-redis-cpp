@@ -9,7 +9,6 @@
 #include <vector>
 #include <optional>
 #include <cstring>
-#include <cstdint>
 #include <unistd.h>
 #include <cassert>
 #include <sys/types.h>
@@ -23,14 +22,38 @@
 #include <utility>
 
 // Our library's header includes.
-#include "string_parser.hpp"
 #include "protocol.hpp"
+#include "string_parser.hpp"
 #include "Utils.hpp"
 
 class Config;
 class Cache;
 
-DataType byte_to_data_type(char first_byte);
+inline DataType byte_to_data_type(char first_byte)
+{
+    switch (first_byte)
+    {
+    case '+':
+        return DataType::SimpleString;
+    case '-':
+        return DataType::SimpleError;
+    case ':':
+        return DataType::Integer;
+    case '$':
+        return DataType::BulkString;
+    case '*':
+        return DataType::Array;
+    default:
+        std::cerr << "Unimplemented parsing for data type: " << first_byte << std::endl;
+        std::terminate();
+    }
+}
+
+template <StringLike StringType>
+DataType get_type(const StringType &s)
+{
+    return s.size() > 0 ? byte_to_data_type(s.front()) : DataType::Unknown;
+}
 
 // Given a string of the Array contents (of size n), break it up into n tokens. We can't simply split by the terminator because some elements are complex (bulk string).
 // Each returned token is the unparsed string. e.g. for an input of "*2\r\n$4\r\nECHO\r\n$2\r\nhi", we return:
@@ -106,12 +129,6 @@ std::vector<std::string> parse_string(const StringType &s, const int num_tokens)
     }
 
     return tokens;
-}
-
-template <StringLike StringType>
-DataType get_type(const StringType &s)
-{
-    return s.size() > 0 ? byte_to_data_type(s.front()) : DataType::Unknown;
 }
 
 // Unfortunately, we can't encode the DataType as a template parameter because then we can't have Array
@@ -190,28 +207,6 @@ Message make_message(T &&data, DataType data_type)
 {
     return Message(std::forward<T>(data), data_type);
 }
-
-// TODO consider using wise_enum to make parsing these commands easier.
-// These are the kinds of commands sent from the client that the server is able to parse and respond to.
-enum class CommandVerb : std::uint8_t
-{
-    Unknown = 0,
-    Ping = 1,
-    Echo = 2,
-    Set = 3,
-    Get = 4,
-    ConfigGet = 5,
-};
-
-// A Message sent from the client to the server is parsed into a Command.
-// This Command is then used by the server to decide what action(s) to take and how to respond to the client.
-struct Command
-{
-    CommandVerb verb{};
-    std::vector<std::string> arguments{};
-
-    static std::string to_string(CommandVerb command);
-};
 
 // Waits to receive data from the given client and returns it as a
 // Message (or nullopt if the client closes the connection).
