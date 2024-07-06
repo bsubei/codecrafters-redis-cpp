@@ -17,9 +17,9 @@
 static constexpr auto TERMINATOR = "\r\n";
 
 // See the table of data types in https://redis.io/docs/latest/develop/reference/protocol-spec/#resp-protocol-description
-enum class DataType
+enum class DataType : std::uint8_t
 {
-    Unknown,
+    Unknown = 0,
     // Comes in this format: +<data>\r\n
     SimpleString,
     SimpleError,
@@ -31,7 +31,7 @@ enum class DataType
     NullBulkString,
     // Comes in this format: *<num_elems>\r\n<elem_1>\r\n....<elem_n>\r\n
     Array,
-    // The rest of these are RESP3, which we don't implement
+    // The rest of these we don't implement for now.
     Null,
     Boolean,
     Double,
@@ -48,11 +48,11 @@ enum class DataType
 enum class CommandVerb : std::uint8_t
 {
     Unknown = 0,
-    Ping = 1,
-    Echo = 2,
-    Set = 3,
-    Get = 4,
-    ConfigGet = 5,
+    Ping,
+    Echo,
+    Set,
+    Get,
+    ConfigGet,
 };
 
 // A Message sent from the client to the server is parsed into a Command.

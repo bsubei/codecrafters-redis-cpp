@@ -55,7 +55,7 @@ namespace
         std::cout << "Closing connection with " << client_fd << std::endl;
         break;
       }
-      std::cout << "Parsing request from client: " << *request << std::endl;
+      std::cout << "Parsing request from client " << client_fd << ": " << *request << std::endl;
 
       const auto request_message = message_from_string(*request);
       std::cout << "Interpreting request as message: " << message_to_string(request_message) << std::endl;
