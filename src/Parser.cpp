@@ -11,8 +11,6 @@
 
 namespace
 {
-    using namespace RESP;
-
     // NOTE: we return a reference to the strings that are in the given message arguments. This is
     // fine as long as the caller doesn't hold on to these references longer than they do the
     // Message they passed in as an argument.
@@ -129,231 +127,227 @@ namespace
 
 } // anonymous namespace
 
-namespace RESP
+std::ostream &operator<<(std::ostream &os, const Message &message)
 {
-
-    std::ostream &operator<<(std::ostream &os, const Message &message)
+    os << "Message (data_type: " << static_cast<int>(message.data_type) << ", data: ";
+    switch (message.data_type)
     {
-        os << "Message (data_type: " << static_cast<int>(message.data_type) << ", data: ";
-        switch (message.data_type)
+    case DataType::Array:
+    {
+        const auto &messages = std::get<std::vector<Message>>(message.data);
+        os << "vector of size " << messages.size() << ": [\n";
+        for (const auto &m : messages)
         {
-        case DataType::Array:
-        {
-            const auto &messages = std::get<std::vector<Message>>(message.data);
-            os << "vector of size " << messages.size() << ": [\n";
-            for (const auto &m : messages)
-            {
-                assert(m.data_type != DataType::Array && "Nested Array messages are not allowed");
-                os << std::get<std::string>(m.data) << ",\n";
-            }
-            os << "\n]";
-            break;
+            assert(m.data_type != DataType::Array && "Nested Array messages are not allowed");
+            os << std::get<std::string>(m.data) << ",\n";
         }
-        default:
-            os << std::get<std::string>(message.data);
-            break;
-        }
-        os << ")\n";
-        return os;
+        os << "\n]";
+        break;
     }
-    std::string Message::to_string() const
-    {
-        std::stringstream ss{};
-        switch (data_type)
-        {
-        case DataType::Array:
-            ss << "*" << std::get<std::vector<Message>>(data).size() << TERMINATOR;
-            for (const auto &elem : std::get<std::vector<Message>>(data))
-            {
-                ss << elem.to_string();
-            }
-            break;
-        case DataType::SimpleString:
-            ss << "+" << std::get<std::string>(data) << TERMINATOR;
-            break;
-        case DataType::BulkString:
-            ss << "$" << std::get<std::string>(data).size() << TERMINATOR << std::get<std::string>(data) << TERMINATOR;
-            break;
-        case DataType::NullBulkString:
-            ss << "$-1" << TERMINATOR;
-            break;
-        default:
-            std::cerr << "Trying to stringify a Message with Unknown DataType" << std::endl;
-            std::terminate();
-        }
-        return ss.str();
+    default:
+        os << std::get<std::string>(message.data);
+        break;
     }
-    DataType byte_to_data_type(char first_byte)
+    os << ")\n";
+    return os;
+}
+std::string Message::to_string() const
+{
+    std::stringstream ss{};
+    switch (data_type)
     {
-        switch (first_byte)
+    case DataType::Array:
+        ss << "*" << std::get<std::vector<Message>>(data).size() << TERMINATOR;
+        for (const auto &elem : std::get<std::vector<Message>>(data))
         {
-        case '+':
-            return DataType::SimpleString;
-        case '-':
-            return DataType::SimpleError;
-        case ':':
-            return DataType::Integer;
-        case '$':
-            return DataType::BulkString;
-        case '*':
-            return DataType::Array;
-        case '_':
-        case ',':
-        case '(':
-        case '!':
-        case '=':
-        case '%':
-        case '~':
-        case '>':
-            std::cerr << "Unimplemented parsing for data type: " << first_byte << std::endl;
-            std::terminate();
-        default:
-            return DataType::Unknown;
+            ss << elem.to_string();
         }
+        break;
+    case DataType::SimpleString:
+        ss << "+" << std::get<std::string>(data) << TERMINATOR;
+        break;
+    case DataType::BulkString:
+        ss << "$" << std::get<std::string>(data).size() << TERMINATOR << std::get<std::string>(data) << TERMINATOR;
+        break;
+    case DataType::NullBulkString:
+        ss << "$-1" << TERMINATOR;
+        break;
+    default:
+        std::cerr << "Trying to stringify a Message with Unknown DataType" << std::endl;
+        std::terminate();
     }
-
-    // TODO I'm now mixing the server abstraction with the parser.
-    std::optional<Message> parse_message_from_client(const int socket_fd)
+    return ss.str();
+}
+DataType byte_to_data_type(char first_byte)
+{
+    switch (first_byte)
     {
-        // TODO assume we only get requests of up to 1024 bytes, not more.
-        constexpr auto BUFFER_SIZE = 1024;
-        constexpr auto FLAGS = 0;
+    case '+':
+        return DataType::SimpleString;
+    case '-':
+        return DataType::SimpleError;
+    case ':':
+        return DataType::Integer;
+    case '$':
+        return DataType::BulkString;
+    case '*':
+        return DataType::Array;
+    case '_':
+    case ',':
+    case '(':
+    case '!':
+    case '=':
+    case '%':
+    case '~':
+    case '>':
+        std::cerr << "Unimplemented parsing for data type: " << first_byte << std::endl;
+        std::terminate();
+    default:
+        return DataType::Unknown;
+    }
+}
 
-        std::array<char, BUFFER_SIZE> buffer{};
-        const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
-        if (num_bytes_read <= 0)
-        {
-            return std::nullopt;
-        }
+// TODO I'm now mixing the server abstraction with the parser.
+std::optional<Message> parse_message_from_client(const int socket_fd)
+{
+    // TODO assume we only get requests of up to 1024 bytes, not more.
+    constexpr auto BUFFER_SIZE = 1024;
+    constexpr auto FLAGS = 0;
 
-        const std::string request(buffer.data(), BUFFER_SIZE);
-        std::cout << "Parsing request from client: " << request << std::endl;
-
-        return Message::from_string(request);
+    std::array<char, BUFFER_SIZE> buffer{};
+    const auto num_bytes_read = recv(socket_fd, buffer.data(), BUFFER_SIZE, FLAGS);
+    if (num_bytes_read <= 0)
+    {
+        return std::nullopt;
     }
 
-    Message generate_response_message(const Message &request_message, Cache &cache, const Config &config)
+    const std::string request(buffer.data(), BUFFER_SIZE);
+    std::cout << "Parsing request from client: " << request << std::endl;
+
+    return Message::from_string(request);
+}
+
+Message generate_response_message(const Message &request_message, Cache &cache, const Config &config)
+{
+    // Figure out what command is being sent to us in the request from the client.
+    // This function also makes sure the Message  has the correct form (Array type if needed, and number of arguments).
+    const auto command = parse_and_validate_command(request_message);
+
+    // Respond with "+OK\r\n" if we don't know how to handle this command.
+    if (!command)
     {
-        // Figure out what command is being sent to us in the request from the client.
-        // This function also makes sure the Message  has the correct form (Array type if needed, and number of arguments).
-        const auto command = parse_and_validate_command(request_message);
-
-        // Respond with "+OK\r\n" if we don't know how to handle this command.
-        if (!command)
-        {
-            // Print out an error but reply with "OK".
-            std::cerr << "Could not parse command from given reqeust: " << request_message.to_string() << std::endl;
-            return Message{"OK", DataType::SimpleString};
-        }
-
-        // Handle any state changes we need to do before replying to the client.
-        // The SET command has the side-effect of updating the given key-value pairs in our cache/db.
-        if (command->verb == CommandVerb::Set)
-        {
-            const auto &key = command->arguments.front();
-            const auto &value = command->arguments[1];
-            std::optional<std::chrono::milliseconds> expiry{};
-            if (command->arguments.size() == 4 && command->arguments[2] == "px")
-            {
-                auto num = std::stoi(command->arguments[3]);
-                expiry = std::chrono::milliseconds(num);
-            }
-
-            cache.set(key, value, expiry);
-        }
-
-        // Now return the response Message we should reply with.
-        Message response_message{};
-
-        // TODO properly do this later (make a function that returns a bulk-string or array response).
-        if (command->verb == CommandVerb::Ping)
-        {
-            // If PING had an argument, reply with PONG and that argument (as bulk strings).
-            if (command->arguments.size() == 1)
-            {
-                const auto data_type = DataType::BulkString;
-                return make_message(
-                    std::vector<Message>{
-                        make_message("PONG", data_type),
-                        make_message(command->arguments.front(), data_type)},
-                    DataType::Array);
-            }
-            // Otherwise, reply with the simple string "PONG".
-            return make_message("PONG", DataType::SimpleString);
-        }
-        else if (command->verb == CommandVerb::Echo)
-        {
-            // TODO we assume ECHO always comes with one and only one argument. We may need to revisit this.
-            return make_message(command->arguments.front(), DataType::BulkString);
-        }
-        else if (command->verb == CommandVerb::Get)
-        {
-            // TODO we don't currently handle "*" globs or multiple keys.
-            // TODO we assume GET always comes with one and only one argument.
-            const auto &key = command->arguments.front();
-            const auto value = cache.get(key);
-            if (value)
-            {
-                return make_message(*value, DataType::BulkString);
-            }
-            // TODO need to handle null bulk string properly
-            return make_message("", DataType::NullBulkString);
-        }
-        else if (command->verb == CommandVerb::ConfigGet)
-        {
-            // TODO we don't currently handle "*" globs or multiple keys.
-            const auto &key = command->arguments.front();
-            std::optional<std::string> value{};
-            if (tolower(key) == "dir")
-            {
-                value = config.dir;
-            }
-            else if (tolower(key) == "dbfilename")
-            {
-                value = config.dbfilename;
-            }
-
-            // Reply with array listing the key and value if found.
-            if (value.has_value())
-            {
-                return make_message(
-                    std::vector<Message>{
-                        make_message(key, DataType::BulkString),
-                        make_message(*value, DataType::BulkString)},
-                    DataType::Array);
-            }
-            // Otherwise, respond with empty array.
-            return make_message(std::vector<Message>{}, DataType::Array);
-        }
-
         // Print out an error but reply with "OK".
-        std::cerr << "Could not generate a valid response for the given command: " << Command::to_string(command->verb)
-                  << ", with args (size " << command->arguments.size() << "): ";
-        for (const auto &arg : command->arguments)
-        {
-            std::cerr << arg;
-        }
-        std::cerr << std::endl;
+        std::cerr << "Could not parse command from given reqeust: " << request_message.to_string() << std::endl;
         return Message{"OK", DataType::SimpleString};
     }
 
-    std::string Command::to_string(CommandVerb command)
+    // Handle any state changes we need to do before replying to the client.
+    // The SET command has the side-effect of updating the given key-value pairs in our cache/db.
+    if (command->verb == CommandVerb::Set)
     {
-        switch (command)
+        const auto &key = command->arguments.front();
+        const auto &value = command->arguments[1];
+        std::optional<std::chrono::milliseconds> expiry{};
+        if (command->arguments.size() == 4 && command->arguments[2] == "px")
         {
-        case CommandVerb::Ping:
-            return "ping";
-        case CommandVerb::Echo:
-            return "echo";
-        case CommandVerb::Set:
-            return "set";
-        case CommandVerb::Get:
-            return "get";
-        case CommandVerb::ConfigGet:
-            return "config get";
-        default:
-            std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
-            std::terminate();
+            auto num = std::stoi(command->arguments[3]);
+            expiry = std::chrono::milliseconds(num);
         }
+
+        cache.set(key, value, expiry);
+    }
+
+    // Now return the response Message we should reply with.
+    Message response_message{};
+
+    // TODO properly do this later (make a function that returns a bulk-string or array response).
+    if (command->verb == CommandVerb::Ping)
+    {
+        // If PING had an argument, reply with PONG and that argument (as bulk strings).
+        if (command->arguments.size() == 1)
+        {
+            const auto data_type = DataType::BulkString;
+            return make_message(
+                std::vector<Message>{
+                    make_message("PONG", data_type),
+                    make_message(command->arguments.front(), data_type)},
+                DataType::Array);
+        }
+        // Otherwise, reply with the simple string "PONG".
+        return make_message("PONG", DataType::SimpleString);
+    }
+    else if (command->verb == CommandVerb::Echo)
+    {
+        // TODO we assume ECHO always comes with one and only one argument. We may need to revisit this.
+        return make_message(command->arguments.front(), DataType::BulkString);
+    }
+    else if (command->verb == CommandVerb::Get)
+    {
+        // TODO we don't currently handle "*" globs or multiple keys.
+        // TODO we assume GET always comes with one and only one argument.
+        const auto &key = command->arguments.front();
+        const auto value = cache.get(key);
+        if (value)
+        {
+            return make_message(*value, DataType::BulkString);
+        }
+        // TODO need to handle null bulk string properly
+        return make_message("", DataType::NullBulkString);
+    }
+    else if (command->verb == CommandVerb::ConfigGet)
+    {
+        // TODO we don't currently handle "*" globs or multiple keys.
+        const auto &key = command->arguments.front();
+        std::optional<std::string> value{};
+        if (tolower(key) == "dir")
+        {
+            value = config.dir;
+        }
+        else if (tolower(key) == "dbfilename")
+        {
+            value = config.dbfilename;
+        }
+
+        // Reply with array listing the key and value if found.
+        if (value.has_value())
+        {
+            return make_message(
+                std::vector<Message>{
+                    make_message(key, DataType::BulkString),
+                    make_message(*value, DataType::BulkString)},
+                DataType::Array);
+        }
+        // Otherwise, respond with empty array.
+        return make_message(std::vector<Message>{}, DataType::Array);
+    }
+
+    // Print out an error but reply with "OK".
+    std::cerr << "Could not generate a valid response for the given command: " << Command::to_string(command->verb)
+              << ", with args (size " << command->arguments.size() << "): ";
+    for (const auto &arg : command->arguments)
+    {
+        std::cerr << arg;
+    }
+    std::cerr << std::endl;
+    return Message{"OK", DataType::SimpleString};
+}
+
+std::string Command::to_string(CommandVerb command)
+{
+    switch (command)
+    {
+    case CommandVerb::Ping:
+        return "ping";
+    case CommandVerb::Echo:
+        return "echo";
+    case CommandVerb::Set:
+        return "set";
+    case CommandVerb::Get:
+        return "get";
+    case CommandVerb::ConfigGet:
+        return "config get";
+    default:
+        std::cerr << "Unknown CommandVerb enum encountered: " << static_cast<int>(command) << std::endl;
+        std::terminate();
     }
 }

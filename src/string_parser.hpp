@@ -36,9 +36,3 @@ int parse_num(auto &it)
     move_past_terminator(it);
     return len;
 }
-
-// TODO get rid of this namespace
-namespace RESP
-{
-
-}

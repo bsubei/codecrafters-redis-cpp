@@ -30,14 +30,14 @@ namespace
       // https://redis.io/docs/latest/develop/reference/protocol-spec/
       // We only deal with simple request-response model for now.
       // TODO we don't support pipelining. So each client sends one request at a time, which results in one response.
-      const auto request_message = RESP::parse_message_from_client(client_fd);
+      const auto request_message = parse_message_from_client(client_fd);
       if (!request_message)
       {
         std::cout << "Closing connection with " << client_fd << std::endl;
         break;
       }
 
-      const auto response_message = RESP::generate_response_message(*request_message, cache, config);
+      const auto response_message = generate_response_message(*request_message, cache, config);
       std::cout << "Generated Response: " << response_message.to_string() << std::endl;
       send_to_client(client_fd, response_message.to_string());
     }
