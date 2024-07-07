@@ -32,15 +32,15 @@ tsan:
 	@echo "Building in tsan mode..."
 	mkdir -p $(BUILD_DIR)/tsan
 	cd $(BUILD_DIR)/tsan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TSAN=ON -DCMAKE_CXX_FLAGS_DEBUG="-O1 -g" ../..
-# TODO: I can't get it to compile the test targets, I get an "unexpected memory mapping" error.
+# TODO: I get an "unexpected memory mapping" error either when compiling the redis_tests target, or when running the server target.
 	cmake --build $(BUILD_DIR)/tsan
-#	cmake --build $(BUILD_DIR)/tsan -t server
 
 msan:
 	@echo "Building in msan mode (Clang only)..."
 	@which clang > /dev/null || (echo "Error: clang not found"; exit 1)
 	@which clang++ > /dev/null || (echo "Error: clang++ not found"; exit 1)
-	cd $(BUILD_DIR)/msan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" ../..
+	mkdir -p $(BUILD_DIR)/msan
+	cd $(BUILD_DIR)/msan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ../..
 	cmake --build $(BUILD_DIR)/msan
 
 test: debug
