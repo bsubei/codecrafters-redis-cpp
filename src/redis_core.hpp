@@ -43,7 +43,7 @@ Message message_from_string(const StringType &s)
         // Split the message into that many tokens (e.g. "$4\r\nECHO\r\n" and "$2\r\nhi\r\n").
         const auto tokens = tokenize_array(s);
         // Recurse over each of these tokens, expecting them to come back as parsed messages of non-Array data_type.
-        std::vector<Message> message_data{};
+        Message::NestedVariantT message_data{};
         message_data.reserve(tokens.size());
         std::transform(tokens.cbegin(), tokens.cend(), std::back_inserter(message_data), [](const auto &token)
                        { return message_from_string(token); });

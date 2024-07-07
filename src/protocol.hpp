@@ -64,6 +64,13 @@ struct Command
     std::vector<std::string> arguments{};
 };
 
+// helper type to create visitors for the Message data variant.
+template <class... Ts>
+struct MessageDataVisitor : Ts...
+{
+    using Ts::operator()...;
+};
+
 // A Message contains "data" to be interpreted based on the stored "data_type". A Message can be constructed from
 // a string received from a client (e.g. "+PING\r\n"), or is generated as a response to the client.
 // When a Message has data_type of Array, its "data" member is of the vector<Message> variant. That means
@@ -73,9 +80,9 @@ struct Command
 // corresponding to data_type.
 struct Message
 {
-    // TODO clean up all the annoying std::get<> when we access this variant.
-    using data_variant_t = std::variant<std::string, std::vector<Message>>;
-    data_variant_t data{};
+    using StringVariantT = std::string;
+    using NestedVariantT = std::vector<Message>;
+    std::variant<StringVariantT, NestedVariantT> data{};
     DataType data_type{};
 
     // Empty ctor
@@ -87,16 +94,19 @@ struct Message
                                                   data_type(data_type_in)
     {
         // TODO this check might make things too slow. Profile this at some point.
+        // We check that the data_type and the data variant always match. i.e. if data_type
+        // is Array, then the data is of the nested (vector) variant. Otherwise, the data is of
+        // the non-nested string variant.
         if (data_type == DataType::Array)
         {
-            if constexpr (!std::is_convertible_v<std::decay_t<T>, std::vector<Message>>)
+            if constexpr (!std::is_convertible_v<std::decay_t<T>, NestedVariantT>)
             {
                 assert(false && "Array messages must be initialized with a vector<Message>");
             }
         }
         else
         {
-            if constexpr (!std::is_convertible_v<std::decay_t<T>, std::string>)
+            if constexpr (!std::is_convertible_v<std::decay_t<T>, StringVariantT>)
             {
                 assert(false && "Non-array messages must be initialized with a string");
             }

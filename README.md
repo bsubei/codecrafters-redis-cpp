@@ -22,8 +22,9 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 
 # Bugs / Missing Features / TODOs
 
-- [ ] the code that reads from the client socket can only handle 1024 bytes.
-- [ ] can't handle client messages with newlines (?)
+- [ ] set up consistent formatter/linter
+- [ ] the code that reads from the client socket can only handle 1024 bytes. (add tests for this)
+- [ ] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
 - [ ] GET commands don't support multiple args or wildcards.
 - [ ] set up `*san` builds and run them regularly.
 
@@ -41,7 +42,10 @@ I'm doing a rehaul of the parser.
 - [x] fix roundtripping tests
 - [x] turn on compiler warning flags
 - [x] consider using istringstream instead of using iterators on the chars (also fix the bugs where we dereference end iterators).
-- [ ] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
+- [x] consider using the visitor pattern on the variant of Message data field (right now I use a bunch of switch statements).
 - [x] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
 - [x] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
 - [x] remove unnecessary header includes
+
+## RDB (persistence)
+Just starting out on the RDB challenge. The goal is to have be able to save the db to disk (and read it when starting up).
