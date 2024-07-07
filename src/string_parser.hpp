@@ -2,24 +2,51 @@
 
 // System includes.
 #include <string>
+#include <utility>
 #include <vector>
 
 // Our library's header includes.
 #include "protocol.hpp"
 #include "utils.hpp"
 
-void move_up_to_terminator(auto &it)
+// Advances the iterator until it points to the start of the next terminator.
+// Calling this if the iterator is already on the terminator does nothing.
+void advance_to_next_terminator(auto &it)
 {
+    // Keep advancing until we see the '\r'.
     while (*it != '\r')
         ++it;
 }
-void move_past_terminator(auto &it)
+// Advances the iterator until it points to directly after the next terminator.
+// Calling this if the iterator is already on the terminator simply advances the iterator two steps.
+void advance_past_next_terminator(auto &it)
 {
-    move_up_to_terminator(it);
-    // Move past the '\r'
+    // Keep advancing until we see the '\r'.
+    advance_to_next_terminator(it);
+    // Advance past the '\r'.
     ++it;
-    // Move past the '\n'
+    // Advance past the '\n'.
     ++it;
+}
+// Given a iterator to a string containing an RESP Array or BulkString, return the length from the header part of the message, and
+// set the "it" to be at the start of the message contents (skips the header).
+// e.g. when given "*2\r\n$4\r\nECHO\r\n$2\r\nhi\r\n", this function returns the int 2 and sets the "it" at the first "$".
+int parse_length_header(auto &it)
+{
+    // Skip the first char (the "*" or "$").
+    ++it;
+    // Reads the chars until the newline and interprets them as an int.
+    // From https://redis.io/docs/latest/develop/reference/protocol-spec/#high-performance-parser-for-the-redis-protocol
+    int len = 0;
+    while (*it != '\r')
+    {
+        len = (len * 10) + (*it - '0');
+        ++it;
+    }
+    // Make sure the iterator skips over the rest of the header ('\r' and '\n').
+    ++it;
+    ++it;
+    return len;
 }
 inline DataType byte_to_data_type(char first_byte)
 {
@@ -47,51 +74,51 @@ DataType get_type(const StringType &s)
     return s.size() > 0 ? byte_to_data_type(s.front()) : DataType::Unknown;
 }
 
-// Given a string/string_view containing an RESP Array, return the length from the header part of the message.
-// e.g. when given "*2\r\n$4\r\nECHO\r\n$2\r\nhi\r\n", this function return the int 2.
-template <StringLike StringType>
-int parse_array_length(const StringType &s)
-{
-    // Skip the first char (the "*").
-    auto it = s.cbegin() + 1;
-    // From https://redis.io/docs/latest/develop/reference/protocol-spec/#high-performance-parser-for-the-redis-protocol
-    int len = 0;
-    while (*it != '\r')
-    {
-        len = (len * 10) + (*it - '0');
-        ++it;
-    }
-    return len;
-}
-
 // Given a string/string_view containing an RESP Array type, return the num_tokens tokens that make up the contents (ignoring the header).
 // e.g. for an input of "*2\r\n$4\r\nECHO\r\n$2\r\nhi\r\n", we return:
 // ["$4\r\nECHO\r\n", "$2\r\nhi\r\n"]
-// TODO reuse parse_string to implement this
+// NOTE: the returned strings retain all the headers/terminators. i.e. the contents are not "parsed" (see parse_string for that).
 template <StringLike StringType>
-std::vector<std::string> tokenize_array(const StringType &s, const int num_tokens)
+std::vector<std::string> tokenize_array(const StringType &s)
 {
+    auto it = s.cbegin();
+    const auto num_tokens = parse_length_header(it);
+    // The iterator is now set at the start of the array contents.
+
+    // Split the rest of the array contents into this many tokens.
     std::vector<std::string> tokens{};
     tokens.reserve(num_tokens);
-    auto it = s.cbegin();
-    // Skip past the array length part, jump right into the actual array contents.
-    move_past_terminator(it);
     for (int i = 0; i < num_tokens; ++i)
     {
         auto terminator_it = it;
         switch (byte_to_data_type(*it))
         {
         case DataType::SimpleString:
-            move_past_terminator(terminator_it);
+            // Grab everything up until and including the next terminator.
+            advance_past_next_terminator(terminator_it);
             tokens.emplace_back(&*it, terminator_it - it);
+            // Set the iterator to the start of the next element for the next iteration.
             it = terminator_it;
             break;
         case DataType::BulkString:
-            move_past_terminator(terminator_it);
-            move_past_terminator(terminator_it);
+            // Grab everything up until and including the 2nd terminator (because bulk strings
+            // have two terminators, e.g. "$2\r\nhi\r\n" and we want to grab the whole thing).
+            advance_past_next_terminator(terminator_it);
+            advance_past_next_terminator(terminator_it);
             tokens.emplace_back(&*it, terminator_it - it);
+            // Set the iterator to the start of the next element for the next iteration.
             it = terminator_it;
             break;
+        // TODO we currently can't read NullBulkString because the first char looks just like a regular BulkString.
+        /*
+        case DataType::NullBulkString:
+            // A Null BulkString looks like: "$-1\r\n"
+            // There is no actual string content we care about.
+            tokens.emplace_back("");
+            // Set the iterator to the start of the next element for the next iteration.
+            advance_past_next_terminator(it);
+            break;
+        */
         default:
             std::cerr << "Unable to tokenize array for given s: " << s << std::endl;
             std::terminate();
@@ -101,36 +128,36 @@ std::vector<std::string> tokenize_array(const StringType &s, const int num_token
     return tokens;
 }
 
-// TODO eventually use the length in the header to efficiently read and also correctly handle text with newlines in it.
-// TODO make this more efficient and avoid creating strings and passing them around
 // Given a string/view containing an RESP non-Array, return its contents based on its exact type.
+// NOTE: the returned string has all the terminators and headers stripped out.
 template <StringLike StringType>
 std::string parse_string(const StringType &s, DataType data_type)
 {
-    // TODO probably better to do this with istringstream
     auto it = s.cbegin();
-
-    // Given a message that looks like this: "$4\r\nECHO\r\n$2\r\nhi", parse the ECHO and hi parts. We ignore the length headers.
-    if (data_type == DataType::BulkString)
+    // Given a message that looks like this: "$4\r\nECHO\r\n", parse and return the "ECHO" part.
+    switch (data_type)
     {
-        // If the it points at a bulk string, just ignore the length header.
-        move_past_terminator(it);
-
-        // Now read the actual string.
-        auto terminator_it = it;
-        move_up_to_terminator(terminator_it);
-        return std::string(&*it, terminator_it - it);
+    case DataType::BulkString:
+    {
+        // Read the number of chars from the length header and set the iterator to the start of the string.
+        const auto num_chars = parse_length_header(it);
+        // Now read the string.
+        return std::string(&*it, num_chars);
     }
-    else if (data_type == DataType::SimpleString)
+
+    case DataType::SimpleString:
     {
-        // Move past the '+' char.
+        // Ignore the '+' char.
         ++it;
-        // Now read the actual string.
+        // TODO test if empty simple strings are allowed.
+        // Now read the actual string (from here up to but not including the next terminator).
         auto terminator_it = it;
-        move_up_to_terminator(terminator_it);
+        advance_to_next_terminator(terminator_it);
         return std::string(&*it, terminator_it - it);
     }
-
-    std::cerr << "Unable to parse_string for given s: " << s << std::endl;
-    std::terminate();
+    default:
+        std::cerr << "Unable to parse_string for given s: " << s << std::endl;
+        std::terminate();
+    }
+    std::unreachable();
 }

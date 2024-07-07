@@ -26,7 +26,7 @@ std::string message_to_string(const Message &message);
 template <StringLike StringType>
 Message message_from_string(const StringType &s)
 {
-    // TODO if given string is missing terminators, we get undefined behavior
+    // TODO if given string is missing terminators, we get undefined behavior. Consider how to do proper error handling without slowing things down (or maybe profile it first).
 
     const auto data_type = get_type(s);
 
@@ -40,18 +40,14 @@ Message message_from_string(const StringType &s)
     // themselves be parsed. Note that we recurse over each of these nested Messages.
     case DataType::Array:
     {
-        // We start with an incoming message that looks like this: "*2\r\n$4\r\nECHO\r\n$2\r\nhi\r\n"
-        // Grab the number of tokens i.e. the "2" in "*2".
-        const auto num_tokens = parse_array_length(s);
-        // Now the remainder of our message looks like this: "$4\r\nECHO\r\n$2\r\nhi\r\n".
         // Split the message into that many tokens (e.g. "$4\r\nECHO\r\n" and "$2\r\nhi\r\n").
-        const auto tokens = tokenize_array(s, num_tokens);
-        // Recurse over each of these tokens, expecting them to come back as two parsed messages of non-Array data_type (e.g. BulkString).
+        const auto tokens = tokenize_array(s);
+        // Recurse over each of these tokens, expecting them to come back as parsed messages of non-Array data_type.
         std::vector<Message> message_data{};
         message_data.reserve(tokens.size());
         std::transform(tokens.cbegin(), tokens.cend(), std::back_inserter(message_data), [](const auto &token)
                        { return message_from_string(token); });
-        // Create a Message that contains that vector of Messages.
+        // Create a Message that contains the vector of Messages.
         return Message(std::move(message_data), data_type);
     }
     // TODO might need to eventually handle NullBulkString if we expect clients to send us nils.
