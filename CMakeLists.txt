@@ -18,6 +18,31 @@ find_package(Threads REQUIRED)
 # Add the third_party directory to the include path
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
+# Options for sanitizers.
+option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
+option(ENABLE_TSAN "Enable Thread Sanitizer" OFF)
+option(ENABLE_UBSAN "Enable Undefined Behavior Sanitizer" OFF)
+option(ENABLE_MSAN "Enable Memory Sanitizer" OFF)
+
+# Add sanitizer flags based on the provided options.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  if(ENABLE_ASAN)
+    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+  endif()
+  if(ENABLE_TSAN)
+    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=thread")
+  endif()
+  if(ENABLE_UBSAN)
+    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=undefined")
+  endif()
+  if(ENABLE_MSAN AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
+  endif()
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SANITIZER_FLAGS}")
+endif()
+
 # GTest library and unit tests
 include(FetchContent)
 FetchContent_Declare(
@@ -46,9 +71,3 @@ target_link_libraries(redis_lib PRIVATE Threads::Threads)
 # Main executable called "server"
 add_executable(server ${SOURCE_FILES} "src/main.cpp")
 target_link_libraries(server PRIVATE redis_lib)
-
-# Define custom target to clean the build directory
-add_custom_target(clean-build
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}
-    COMMENT "Cleaning the build directory"
-)

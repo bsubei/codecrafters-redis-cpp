@@ -85,7 +85,7 @@ std::optional<Command> parse_and_validate_command(const Message &message) {
     // SET must have at least two arguments (the key and value to set).
     if (is_array(message)) {
       const auto &messages = std::get<Message::NestedVariantT>(message.data);
-      for (const auto &m : messages) {
+      for ([[maybe_unused]] const auto &m : messages) {
         assert(m.data_type != DataType::Array &&
                "Nested Array messages are not allowed!");
       }
@@ -107,7 +107,7 @@ std::optional<Command> parse_and_validate_command(const Message &message) {
     // CONFIG GET must provide at least one argument.
     if (is_array(message)) {
       const auto &messages = std::get<Message::NestedVariantT>(message.data);
-      for (const auto &m : messages) {
+      for ([[maybe_unused]] const auto &m : messages) {
         assert(m.data_type != DataType::Array &&
                "Nested Array messages are not allowed!");
       }

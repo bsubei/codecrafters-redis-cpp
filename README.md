@@ -26,7 +26,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [ ] the code that reads from the client socket can only handle 1024 bytes. (add tests for this)
 - [ ] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
 - [ ] GET commands don't support multiple args or wildcards.
-- [ ] set up `*san` builds and run them regularly.
+- [x] set up `*san` builds and run them regularly.
 
 # Progress Log
 
@@ -46,6 +46,7 @@ I'm doing a rehaul of the parser.
 - [x] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
 - [x] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
 - [x] remove unnecessary header includes
+- [ ] one last thing: need to run in all the sanitizer modes and fix issues
 
 ## RDB (persistence)
 Just starting out on the RDB challenge. The goal is to have be able to save the db to disk (and read it when starting up).
