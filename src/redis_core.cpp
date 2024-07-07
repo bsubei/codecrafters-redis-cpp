@@ -13,23 +13,23 @@
 #include "utils.hpp"
 
 namespace {
-// NOTE: we return a string view into the given message arguments. This is fine
-// as long as the caller doesn't hold on to these references longer than they do
-// the Message they passed in as an argument.
-std::string_view get_first_elem(const Message &message) {
+// NOTE: we return a reference to one of the strings inside the given message
+// arguments. This is fine as long as the caller doesn't hold on to these
+// references longer than they do the Message they passed in as an argument.
+const std::string &get_first_elem(const Message &message) {
   return std::visit(
       MessageDataVisitor{
-          [](const Message::NestedVariantT &message_data) {
+          [](const Message::NestedVariantT &message_data)
+              -> const std::string & {
             const auto &first_message = message_data.front();
             assert(std::holds_alternative<Message::StringVariantT>(
                        first_message.data) &&
                    "Nested Array messages are not allowed!");
             return std::get<Message::StringVariantT>(first_message.data);
           },
-          [](const Message::StringVariantT &message_data) {
-            return message_data;
-          },
-          [](const auto &&message_data) {
+          [](const Message::StringVariantT &message_data)
+              -> const std::string & { return message_data; },
+          [](const auto &&message_data) -> const std::string & {
             std::cerr << "Unable to call get_first_elem on message with data: "
                       << message_data << std::endl;
             std::terminate();
@@ -42,7 +42,6 @@ bool is_array(const Message &message) {
 }
 
 } // anonymous namespace
-
 // TODO we can probably get away with moving the message when calling this func
 // since it's not used afterwards.
 std::optional<Command> parse_and_validate_command(const Message &message) {
