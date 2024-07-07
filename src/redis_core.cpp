@@ -169,20 +169,14 @@ std::string message_to_string(const Message &message) {
 Message generate_response_message(const Command &command, const Config &config,
                                   Cache &cache) {
   if (command.verb == CommandVerb::Ping) {
-    // If PING had an argument, reply with PONG and that argument (as bulk
-    // strings).
+    // If PING had an argument, reply with just that argument like ECHO would.
     if (command.arguments.size() == 1) {
       const auto data_type = DataType::BulkString;
-      return Message(Message::NestedVariantT{Message("PONG", data_type),
-                                             Message(command.arguments.front(),
-                                                     data_type)},
-                     DataType::Array);
+      return Message(command.arguments.front(), data_type);
     }
     // Otherwise, reply with the simple string "PONG".
     return Message("PONG", DataType::SimpleString);
   } else if (command.verb == CommandVerb::Echo) {
-    // TODO we assume ECHO always comes with one and only one argument. We may
-    // need to revisit this.
     return Message(command.arguments.front(), DataType::BulkString);
   } else if (command.verb == CommandVerb::Get) {
     // TODO we don't currently handle "*" globs or multiple keys.
