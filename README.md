@@ -22,7 +22,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 
 # Bugs / Missing Features / TODOs
 
-- [ ] set up consistent formatter/linter
+- [x] set up consistent formatter/linter
 - [ ] the code that reads from the client socket can only handle 1024 bytes. (add tests for this)
 - [ ] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
 - [ ] GET commands don't support multiple args or wildcards.

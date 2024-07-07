@@ -3,31 +3,31 @@
 // System includes.
 #include <deque>
 #include <future>
-#include <unordered_map>
 #include <optional>
+#include <unordered_map>
 
 // Our library's header includes.
 #include "cache.hpp"
 #include "config.hpp"
 
-class Server
-{
+class Server {
 private:
-    std::optional<int> socket_fd_{};
-    // These futures are handles to the asynchronous tasks, each handling a client connection.
-    std::deque<std::future<void>> futures_{};
+  std::optional<int> socket_fd_{};
+  // These futures are handles to the asynchronous tasks, each handling a client
+  // connection.
+  std::deque<std::future<void>> futures_{};
 
-    Cache cache_{};
+  Cache cache_{};
 
-    Config config_{};
+  Config config_{};
 
 public:
-    Server(Config config);
-    ~Server();
+  Server(Config config);
+  ~Server();
 
-    bool is_ready() const;
+  bool is_ready() const;
 
-    void run();
+  void run();
 
-    void cleanup_finished_client_tasks();
+  void cleanup_finished_client_tasks();
 };
