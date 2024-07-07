@@ -13,7 +13,7 @@
 #include "string_parser.hpp"
 #include "utils.hpp"
 
-class Config;
+struct Config;
 class Cache;
 
 // Figure out what command is being sent to us in the request from the client.
