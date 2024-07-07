@@ -20,6 +20,12 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - `make run -- <any args go here>` if you want to run the `server` executable with flags.
 - NOTE: you can't combine multiple rules (like `make clean run`) if you also try to pass arguments.
 
+# Bugs / Missing Features / TODOs
+
+- [ ] the code that reads from the client socket can only handle 1024 bytes.
+- [ ] can't handle client messages with newlines (?)
+- [ ] GET commands don't support multiple args or wildcards.
+- [ ] set up `*san` builds and run them regularly.
 
 # Progress Log
 

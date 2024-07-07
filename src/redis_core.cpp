@@ -187,7 +187,6 @@ Message generate_response_message(const Command &command, const Config &config, 
         {
             return Message(*value, DataType::BulkString);
         }
-        // TODO need to handle null bulk string properly
         return Message("", DataType::NullBulkString);
     }
     else if (command.verb == CommandVerb::ConfigGet)

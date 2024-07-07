@@ -32,7 +32,6 @@ target_link_libraries(redis_tests PRIVATE redis_lib GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(redis_tests)
 
-# TODO turn these on very soon once the other CMake issues are resolved.
 # Add somewhat strict warning flags. This applies to all targets defined after here.
 if(MSVC)
   add_compile_options(/W4 /WX)
