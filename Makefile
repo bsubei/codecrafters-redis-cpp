@@ -40,8 +40,12 @@ msan:
 	@which clang > /dev/null || (echo "Error: clang not found"; exit 1)
 	@which clang++ > /dev/null || (echo "Error: clang++ not found"; exit 1)
 	mkdir -p $(BUILD_DIR)/msan
-	cd $(BUILD_DIR)/msan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ../..
-	cmake --build $(BUILD_DIR)/msan --parallel
+	cd $(BUILD_DIR)/msan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON \
+	-DCMAKE_CXX_FLAGS_DEBUG="-O1 -g" \
+	-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ../..
+# TODO try only compiling the non-test parts
+#	cmake --build $(BUILD_DIR)/msan --parallel
+	cmake --build $(BUILD_DIR)/msan --parallel -t server
 
 test: debug
 	@echo "Running tests..."

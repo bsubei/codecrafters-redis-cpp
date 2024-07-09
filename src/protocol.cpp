@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+// TODO this is causing issues in MSAN
+/*
 std::ostream &operator<<(std::ostream &os, const Message &message) {
   os << "Message (data_type: " << static_cast<int>(message.data_type)
      << ", data: ";
@@ -34,3 +36,4 @@ std::ostream &operator<<(std::ostream &os, const Message &message) {
   os << ")\n";
   return os;
 }
+*/

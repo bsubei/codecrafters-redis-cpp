@@ -111,6 +111,7 @@ struct Message {
 
   bool operator==(const Message &other) const = default;
 
+  // TODO this is causing issues in MSAN
   // For displaying in GTEST.
-  friend std::ostream &operator<<(std::ostream &os, const Message &message);
+  // friend std::ostream &operator<<(std::ostream &os, const Message &message);
 };

@@ -24,10 +24,6 @@ int main(int argc, char **argv) {
   dbfilename_option->needs(dir_option);
   CLI11_PARSE(app, argc, argv);
 
-#ifndef NDEBUG
-  std::cout << "DEBUG MODE ON!!!" << std::endl;
-#endif
-
   Server server{std::move(config)};
   if (!server.is_ready()) {
     return 1;
