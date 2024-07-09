@@ -65,7 +65,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   endif()
   if(ENABLE_MSAN AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
-    target_compile_options(server PRIVATE -fsanitize-blacklist=${CMAKE_SOURCE_DIR}/msan_blacklist.txt)
+# TODO consider adding -fsanitize-memory-track-origins=2
+    target_compile_options(server PRIVATE -fsanitize-blacklist=${CMAKE_SOURCE_DIR}/san_blacklist.txt)
   endif()
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_FLAGS}")

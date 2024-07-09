@@ -1,0 +1,4 @@
+#!special-case-list-v2
+# Have all the sanitizer blacklist the CLI11 library.
+[*]
+src:*/third_party/*

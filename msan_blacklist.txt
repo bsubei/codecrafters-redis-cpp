@@ -1,2 +1,0 @@
-src:*/third_party/CLI11.hpp
-src:*/googletest-src/**
