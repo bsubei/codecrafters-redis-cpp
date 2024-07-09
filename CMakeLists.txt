@@ -17,7 +17,14 @@ find_package(Threads REQUIRED)
 # Add the third_party directory to the include path
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
-# GTest library and unit tests
+# Add somewhat strict warning flags. This applies to all targets defined below this point (we want this to be everything).
+if(MSVC)
+  add_compile_options(/W4 /WX)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# GTest library and unit test targets.
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -31,18 +38,11 @@ target_link_libraries(redis_tests PRIVATE redis_lib GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(redis_tests)
 
-# Add somewhat strict warning flags. This applies to all targets defined after here.
-if(MSVC)
-  add_compile_options(/W4 /WX)
-else()
-  add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-endif()
-
-# NOTE: header files are already included since they're in the same dir as the source files.
+# Most of our code is in this library target.
 add_library(redis_lib ${SOURCE_FILES})
 target_link_libraries(redis_lib PRIVATE Threads::Threads)
 
-# Main executable called "server"
+# Main executable called "server".
 add_executable(server ${SOURCE_FILES} "src/main.cpp")
 target_link_libraries(server PRIVATE redis_lib)
 
@@ -52,7 +52,7 @@ option(ENABLE_TSAN "Enable Thread Sanitizer" OFF)
 option(ENABLE_UBSAN "Enable Undefined Behavior Sanitizer" OFF)
 option(ENABLE_MSAN "Enable Memory Sanitizer" OFF)
 
-# Add sanitizer flags based on the provided options.
+# Add sanitizer flags based on the provided options. These are passed in by the Makefile rules.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   if(ENABLE_ASAN)
     set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
@@ -64,8 +64,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=undefined")
   endif()
   if(ENABLE_MSAN AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
-# TODO consider adding -fsanitize-memory-track-origins=2
+    set(SANITIZER_FLAGS "${SANITIZER_FLAGS} -fsanitize=memory -fno-omit-frame-pointer -fsanitize-memory-track-origins=2")
+  endif()
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND (ENABLE_ASAN OR ENABLE_TSAN OR ENABLE_UBSAN OR ENABLE_MSAN))
+  # Add the sanitizer blacklist file.
     target_compile_options(server PRIVATE -fsanitize-blacklist=${CMAKE_SOURCE_DIR}/san_blacklist.txt)
   endif()
 

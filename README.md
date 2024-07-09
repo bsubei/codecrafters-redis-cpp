@@ -27,8 +27,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [ ] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
 - [ ] GET commands don't support multiple args or wildcards.
 - [x] set up `*san` builds and run them regularly.
-- [ ] fix tsan `unexpected memory mapping` error.
-- [ ] use blacklists to get msan and tsan to shut up about CLI11 and GTest
+- [x] use blacklists to get msan and tsan to shut up about CLI11
 
 # Progress Log
 
