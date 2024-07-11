@@ -32,7 +32,7 @@ asan:
 	@echo "Building in asan mode (both ASAN and UBSAN)..."
 	mkdir -p $(BUILD_DIR)/asan
 	cd $(BUILD_DIR)/asan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON \
-		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g" \
+		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g -gdwarf-4" \
 		../..
 	cmake --build $(BUILD_DIR)/asan --parallel -t server
 	./$(BUILD_DIR)/asan/server
@@ -43,7 +43,7 @@ tsan:
 	mkdir -p $(BUILD_DIR)/tsan
 # TODO: I get an "unexpected memory mapping" error when compiling the server target under gcc. Sticking to clang for now.
 	cd $(BUILD_DIR)/tsan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TSAN=ON \
-		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g" \
+		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g -gdwarf-4" \
 		../..
 	cmake --build $(BUILD_DIR)/tsan --parallel -t server
 	./$(BUILD_DIR)/tsan/server
@@ -56,14 +56,19 @@ msan:
 	mkdir -p $(BUILD_DIR)/msan
 	cd $(BUILD_DIR)/msan && cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON \
 		-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g" \
+		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g -gdwarf-4" \
 		../..
-# TODO: tried the below to get around false positives in the standard lib. Runs into trouble with CLI11.
+# TODO: tried the below to get around false positives in the gnu standard lib. Runs into trouble with CLI11.
 #		-DCMAKE_CXX_FLAGS="-stdlib=libc++" \
 #		-DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -lc++abi" \
 
 	cmake --build $(BUILD_DIR)/msan --parallel -t server
 	./$(BUILD_DIR)/msan/server
+
+valgrind: debug
+	@echo "Running valgrind on program..."
+	@which valgrind > /dev/null || (echo "Error: valgrind not found"; exit 1)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(BUILD_DIR)/debug/server
 
 # Run all tests in Debug mode.
 test: debug

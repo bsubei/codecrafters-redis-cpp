@@ -29,7 +29,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [x] set up `*san` builds and run them regularly.
 - [x] use blacklists to get msan and tsan to shut up about CLI11
 - [ ] move all the flags from make to cmake
-- [ ] figure out a way to fix false-positives in msan
+- [ ] figure out a way to fix false-positives in msan (need to build and instrument my own libc, see [here](https://clang.llvm.org/docs/MemorySanitizer.html#handling-external-code)).
 
 # Progress Log
 
@@ -49,7 +49,7 @@ I'm doing a rehaul of the parser.
 - [x] clean up the header/source files. Lots of redundant stuff, stale comments, etc. Throw out old parser logic once the new refactored parser is hooked up.
 - [x] cleanly break apart the server logic from the Parser file. Also clean up all the namespacing mess I made.
 - [x] remove unnecessary header includes
-- [ ] one last thing: need to run in all the sanitizer modes and fix issues
+- [x] one last thing: need to run in all the sanitizer modes and fix issues
 
 ## RDB (persistence)
 Just starting out on the RDB challenge. The goal is to have be able to save the db to disk (and read it when starting up).
