@@ -1,8 +1,8 @@
 #pragma once
 
 // System includes.
+#include <exception>
 #include <string>
-#include <utility>
 #include <vector>
 
 // Our library's header includes.

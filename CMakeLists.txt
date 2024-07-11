@@ -10,6 +10,8 @@ file(GLOB_RECURSE TEST_FILES tests/*.cpp)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# TODO was trying to get msan to work, this was one of the things I tried.
+# set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

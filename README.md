@@ -28,6 +28,8 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [ ] GET commands don't support multiple args or wildcards.
 - [x] set up `*san` builds and run them regularly.
 - [x] use blacklists to get msan and tsan to shut up about CLI11
+- [ ] move all the flags from make to cmake
+- [ ] figure out a way to fix false-positives in msan
 
 # Progress Log
 

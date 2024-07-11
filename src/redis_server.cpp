@@ -9,6 +9,7 @@
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <unistd.h>
 
 namespace {
 
@@ -120,7 +121,8 @@ void Server::run() {
     auto last_cleanup_time = std::chrono::system_clock::now();
     while (is_ready()) {
       // The main server thread should clean up any stale tasks every now and
-      // then.
+      // then. This should be pretty fast as it does not block on unfinished
+      // tasks, just leaves them be.
       if (std::chrono::system_clock::now() - last_cleanup_time >
           CLEANUP_TASKS_DURATION) {
         cleanup_finished_client_tasks();
@@ -130,6 +132,10 @@ void Server::run() {
       // If we've ended up creating too many simultaneous connections, wait
       // until the oldest connection closes. This makes sure the server doesn't
       // get too swamped with incoming client connections and makes them wait.
+      // NOTE: this means the server intentionally stops responding to new
+      // client connections until some clients finish. Ideally, we should only
+      // wait a little bit for the front task and move on to the next ones in
+      // the hope of finding a finished one.
       if (futures_.size() >= ASYNC_MAX_LIMIT) {
         wait_for_async_task(futures_.front());
         futures_.pop_front();
@@ -137,14 +143,17 @@ void Server::run() {
 
       // TODO the problem here is that because the main thread blocks on
       // awaiting clients, we're not displaying any exceptions from the async
-      // tasks to console until we get another connection. Create a new
-      // connection and spawn off an async task to handle this client. NOTE: we
-      // give the task a reference to the cache since the tasks don't own the
-      // cache; this server process does instead. The server will be alive as
-      // long as any of the tasks. NOTE: we pass off the cache using std::ref()
-      // because otherwise it would attempt to copy the cache (which is a
-      // move-only type due to the mutex). NOTE: passing the config_ is
-      // thread-safe because we never modify it, just read from it.
+      // tasks to console until we get another connection.
+
+      // Create a new connection and spawn off an async task to handle this
+      // client.
+      // NOTE: we give the task a reference to the cache since the tasks
+      // don't own the cache; this server process does instead. The server will
+      // be alive as long as any of the tasks.
+      // NOTE: we pass off the cache using std::ref() because otherwise it would
+      // attempt to copy the cache (which is a move-only type due to the mutex).
+      // NOTE: passing the config_ is thread-safe because we never modify it,
+      // just read from it.
       const int client_fd = await_client_connection(*socket_fd_);
       futures_.push_back(std::async(std::launch::async,
                                     handle_client_connection, client_fd,
