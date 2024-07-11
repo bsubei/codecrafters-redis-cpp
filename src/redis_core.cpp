@@ -205,16 +205,19 @@ Message generate_response_message(const Command &command, const Config &config,
     }
     // Otherwise, respond with empty array.
     return Message(Message::NestedVariantT{}, DataType::Array);
+  } else if (command.verb == CommandVerb::Set) {
+    // Send back OK.
+    return Message{"OK", DataType::SimpleString};
   }
 
   // Print out an error but reply with "OK".
   std::cerr << "Could not generate a valid response for the given command: "
             << command_to_string(command.verb) << ", with args (size "
             << command.arguments.size() << "): ";
-  for (const auto &arg : command.arguments) {
-    std::cerr << arg;
-  }
   std::cerr << std::endl;
+  for (const auto &arg : command.arguments) {
+    std::cerr << arg << std::endl;
+  }
   return Message{"OK", DataType::SimpleString};
 }
 
