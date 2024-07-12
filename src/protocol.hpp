@@ -56,6 +56,7 @@ enum class CommandVerb : std::uint8_t {
   Set,
   Get,
   ConfigGet,
+  Keys,
 };
 
 // A Message sent from the client to the server is parsed into a Command.

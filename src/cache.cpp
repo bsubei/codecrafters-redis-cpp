@@ -1,6 +1,9 @@
 // This source file's own header include.
 #include "cache.hpp"
 
+// System includes.
+#include <algorithm>
+
 // TODO clean up any expired cache elements we try to access so we don't waste
 // time checking their expiry next time around.
 // TODO eventually have the server actively go around testing for expired values
@@ -32,4 +35,15 @@ void Cache::set(
         std::chrono::steady_clock::now() + expiry_duration.value();
   }
   data[key] = value;
+}
+
+std::vector<std::string> Cache::keys() const {
+  // Acquire a "shared" lock, so we only lock out writes to the cache.
+  // Simultaneous reads don't need to wait.
+  std::shared_lock lock(mutex);
+  std::vector<std::string> keys{};
+  keys.reserve(data.size());
+  std::transform(data.cbegin(), data.cend(), std::back_inserter(keys),
+                 [](const auto &e) { return e.first; });
+  return keys;
 }

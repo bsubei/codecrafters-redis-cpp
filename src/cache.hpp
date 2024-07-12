@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class Cache {
 private:
@@ -22,4 +23,5 @@ public:
   void set(const std::string &key, const std::string &value,
            const std::optional<std::chrono::milliseconds> &expiry_duration =
                std::nullopt);
+  std::vector<std::string> keys() const;
 };
