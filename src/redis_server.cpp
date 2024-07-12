@@ -4,6 +4,7 @@
 // Our library's header includes.
 #include "network.hpp"
 #include "redis_core.hpp"
+#include "storage.hpp"
 
 // System includes.
 #include <cassert>
@@ -94,10 +95,8 @@ bool is_async_task_done(std::future<void> &f) {
 } // anonymous namespace
 
 Server::Server(Config config)
-    : socket_fd_(create_server_socket()), futures_(), cache_(),
-      config_(std::move(config)) {
-  // TODO open and load dir/dbfilename
-}
+    : socket_fd_(create_server_socket()), futures_(),
+      cache_(read_cache_from_rdb(config)), config_(std::move(config)) {}
 
 bool Server::is_ready() const { return socket_fd_.has_value(); }
 
