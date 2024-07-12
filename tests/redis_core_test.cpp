@@ -51,8 +51,3 @@ TEST(MessageTest, RoundTrip) {
   EXPECT_EQ(m3, message_from_string(message_to_string(m3)));
   EXPECT_EQ(empty, message_from_string(message_to_string(empty)));
 }
-
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
