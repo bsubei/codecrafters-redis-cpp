@@ -16,10 +16,10 @@ std::optional<std::string> Cache::get(const std::string &key) const {
   // If the data exists,
   if (data.contains(key)) {
     // and if the data is unexpired,
-    if (!data_expiry.contains(key) ||
-        std::chrono::steady_clock::now() <= data_expiry.at(key)) {
+    if (!data.at(key).second.has_value() ||
+        std::chrono::steady_clock::now() <= *data.at(key).second) {
       // Get the value for this key.
-      return data.at(key);
+      return data.at(key).first;
     }
   }
   return std::nullopt;
@@ -27,14 +27,14 @@ std::optional<std::string> Cache::get(const std::string &key) const {
 void Cache::set(
     const std::string &key, const std::string &value,
     const std::optional<std::chrono::milliseconds> &expiry_duration) {
+  ExpiryValueT expiry_time = std::nullopt;
+  if (expiry_duration.has_value()) {
+    expiry_time = std::chrono::steady_clock::now() + expiry_duration.value();
+  }
   // Acquire a unique lock, blocking out every other read/write, because we're
   // writing to the cache.
   std::unique_lock lock(mutex);
-  if (expiry_duration.has_value()) {
-    data_expiry[key] =
-        std::chrono::steady_clock::now() + expiry_duration.value();
-  }
-  data[key] = value;
+  data[key] = {value, expiry_time};
 }
 
 std::vector<std::string> Cache::keys() const {
