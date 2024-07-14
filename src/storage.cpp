@@ -15,11 +15,11 @@
 
 namespace {
 
-std::ifstream read_file(const std::filesystem::path &filepath) {
+std::optional<std::ifstream> read_file(const std::filesystem::path &filepath) {
   std::ifstream file_contents(filepath, std::ios::binary);
   if (!file_contents) {
     std::cerr << "Failed to read file contents at: " << filepath << std::endl;
-    std::terminate();
+    return std::nullopt;
   }
   return file_contents;
 }
@@ -116,7 +116,6 @@ Header read_rdb_header(std::istream &is) {
   if (version < MIN_SUPPORTED_RDB_VERSION) {
     std::cerr << "RDB version is too old: " << std::to_string(version)
               << std::endl;
-    std::terminate();
   }
 
   return Header{.version = version};
@@ -374,7 +373,10 @@ Cache load_cache(const Config &config) {
                           std::filesystem::path(*config.dbfilename);
     std::cout << "Reading RDB from file: " << filepath << std::endl;
     auto file_contents = read_file(filepath);
-    auto rdb = read_rdb(file_contents);
+    if (!file_contents) {
+      return Cache{};
+    }
+    auto rdb = read_rdb(*file_contents);
     if (rdb.database_sections.size() == 0) {
       std::cerr
           << "Expected to find at least one Database section in RDB file: "
