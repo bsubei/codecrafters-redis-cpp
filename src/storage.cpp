@@ -27,10 +27,27 @@ std::string read_string_n_bytes(std::istream &is, const std::size_t num_bytes) {
   return buf;
 }
 
-template <typename T> T bytes_to_int(const std::vector<std::byte> &bytes) {
-  T result;
-  // Copy over all the bytes and make a number out of it.
-  std::memcpy(&result, bytes.data(), sizeof(T));
+// Copy over all the bytes and return an appropriately-sized int out of them.
+template <std::size_t num_bytes>
+decltype(auto) bytes_to_int(const std::array<std::byte, num_bytes> &bytes) {
+  // Use the lambda to declare the result with different types so we can use it
+  // outside the constexpr if blocks.
+  constexpr auto lambda = []() {
+    if constexpr (num_bytes == 1) {
+      return static_cast<std::uint8_t>(0);
+    } else if constexpr (num_bytes == 2) {
+      return static_cast<std::uint16_t>(0);
+    } else if constexpr (num_bytes == 4) {
+      return static_cast<std::uint32_t>(0);
+    } else if constexpr (num_bytes == 8) {
+      return static_cast<std::uint64_t>(0);
+    } else {
+      static_assert(false && "Unsupported num_bytes was given");
+    }
+  };
+
+  auto result = lambda();
+  std::memcpy(&result, bytes.data(), num_bytes);
   // If we are big endian, we need to swap the bytes from little endian to big
   // endian.
   if constexpr (std::endian::native == std::endian::big) {
@@ -39,25 +56,16 @@ template <typename T> T bytes_to_int(const std::vector<std::byte> &bytes) {
   return result;
 }
 
-std::uint32_t read_int_n_bytes(std::istream &is, const std::size_t num_bytes) {
-  std::vector<std::byte> buf{};
-  buf.resize(num_bytes);
+template <std::size_t num_bytes>
+decltype(auto) read_int_n_bytes(std::istream &is) {
+  std::array<std::byte, num_bytes> buf{};
   is.read(reinterpret_cast<char *>(buf.data()), num_bytes);
   if (!is.good()) {
     std::cerr << "Unable to read int with " << num_bytes << " bytes"
               << std::endl;
     std::terminate();
   }
-  if (num_bytes == 1) {
-    return bytes_to_int<std::uint8_t>(buf);
-  } else if (num_bytes == 2) {
-    return bytes_to_int<std::uint16_t>(buf);
-  } else if (num_bytes == 4) {
-    return bytes_to_int<std::uint32_t>(buf);
-  } else {
-    std::cerr << "Unsupported num_bytes was given: " << num_bytes << std::endl;
-    std::terminate();
-  }
+  return bytes_to_int<num_bytes>(buf);
 }
 
 } // namespace
@@ -103,27 +111,26 @@ std::string parse_length_encoded_string(std::istream &is) {
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
   // covers lengths from 16384 to (2^32)-1.
   case 0b10: {
-    const auto length = read_int_n_bytes(is, 4);
+    const auto length = read_int_n_bytes<4>(is);
     return read_string_n_bytes(is, length);
   }
   // Special format. We only support "Integers as Strings". Expect 0, 1, or 2
   // in the remaining 6 bits.
   case 0b11: {
     std::byte string_encoding_bits = length_byte & std::byte{0x3F};
-    std::size_t num_bytes_to_read = 0;
     switch (std::to_integer<std::uint8_t>(string_encoding_bits)) {
     // An 8 bit integer follows.
     case 0:
-      num_bytes_to_read = 1;
-      break;
+      // Read the next 1 byte as an integer, and convert to a string.
+      return std::to_string(read_int_n_bytes<1>(is));
     // A 16 bit integer follows.
     case 1:
-      num_bytes_to_read = 2;
-      break;
+      // Same but two bytes instead of one.
+      return std::to_string(read_int_n_bytes<2>(is));
     // A 32 bit integer follows.
     case 2:
-      num_bytes_to_read = 4;
-      break;
+      // Same but four bytes instead of one.
+      return std::to_string(read_int_n_bytes<4>(is));
     default:
       std::cerr << "Encountered unsupported string length encoding: "
                 << std::setbase(16)
@@ -131,10 +138,6 @@ std::string parse_length_encoded_string(std::istream &is) {
                 << std::endl;
       std::terminate();
     }
-    // Read the next N bytes as an integer (accounting for bytes coming in
-    // little-endian), and convert to a string.
-    std::uint32_t number = read_int_n_bytes(is, num_bytes_to_read);
-    return std::to_string(number);
   }
   default:
     std::cerr << "Encountered unknown length encoding: " << std::setbase(16)
