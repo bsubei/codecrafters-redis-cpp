@@ -96,6 +96,8 @@ bool is_async_task_done(std::future<void> &f) {
 
 Server::Server(Config config)
     : socket_fd_(create_server_socket()), futures_(),
+      // TODO assume there's only one database we read from the RDB file. We
+      // don't handle multiple databases.
       cache_(read_cache_from_rdb(config)), config_(std::move(config)) {}
 
 bool Server::is_ready() const { return socket_fd_.has_value(); }

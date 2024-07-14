@@ -2,7 +2,9 @@
 
 // System includes.
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <istream>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -12,17 +14,18 @@
 
 struct Config;
 
-Cache read_cache_from_rdb(const Config &config);
-
 // RDB file format, see https://rdb.fnordig.de/file_format.html for details.
 // Op codes
-constexpr uint8_t RDB_EOF = 0xFF;
-constexpr uint8_t RDB_DB_SELECTOR = 0xFE;
-constexpr uint8_t RDB_EXPIRE_TIME_S = 0xFD;
-constexpr uint8_t RDB_EXPIRE_TIME_MS = 0xFC;
-constexpr uint8_t RDB_AUX = 0xFA; // Auxiliary fields (AKA metadata fields).
+constexpr std::byte RDB_EOF{0xFF};
+constexpr std::byte RDB_DB_SELECTOR{0xFE};
+constexpr std::byte RDB_EXPIRE_TIME_S{0xFD};
+constexpr std::byte RDB_EXPIRE_TIME_MS{0xFC};
+constexpr std::byte RDB_RESIZE{0xFB};
+constexpr std::byte RDB_AUX{0xFA}; // Auxiliary fields (AKA metadata fields).
 // TODO we only support version 7 exactly.
 constexpr auto RDB_MAGIC = "REDIS0007";
+// The two most-significant bits encode the length.
+constexpr std::byte LENGTH_ENCODING_MASK{0b11000000};
 
 enum class NumBits {
   ARCHITECTURE_32_BITS,
@@ -52,3 +55,6 @@ struct RDB {
   std::vector<DatabaseSection> database_sections{};
   EndOfFile eof{};
 };
+
+std::string parse_length_encoded_string(std::istream &is);
+Cache read_cache_from_rdb(const Config &config);
