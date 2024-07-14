@@ -34,7 +34,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // Test case: length encoding bits are 00 and length is zero.
   // NOTE: we have to be a little careful because std::string treats "\0" bytes
   // as a c-str null char.
-  std::istringstream input{std::string{"\x00", 1}};
+  std::istringstream input{std::string("\x00", 1)};
   std::string expected_output = "";
   std::string actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
@@ -90,8 +90,8 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // discarded). The next four bytes come in little-endian and make up the
   // length 16384 (which is the same as the swapped bytes: 0x00004000).
   expected_output = get_random_string_n_bytes(16384);
-  input = std::istringstream{"\x80" + std::string{"\x00", 1} + "\x40" +
-                             std::string{"\x00", 2} + expected_output};
+  input = std::istringstream{"\x80" + std::string("\x00", 1) + "\x40" +
+                             std::string("\x00", 2) + expected_output};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);
@@ -101,8 +101,65 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // discarded). The next four bytes come in little-endian and make up the
   // length 17000 (which is the same as the swapped bytes: 0x00004268).
   expected_output = get_random_string_n_bytes(17000);
-  input = std::istringstream{"\x80\x68\x42" + std::string{"\x00", 2} +
+  input = std::istringstream{"\x80\x68\x42" + std::string("\x00", 2) +
                              expected_output};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string an 8-bit integer with
+  // value 0.
+  expected_output = "0";
+  input = std::istringstream{"\xC0" + std::string("\x00", 1)};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string an 8-bit integer with
+  // value 1.
+  expected_output = "1";
+  input = std::istringstream{"\xC0\x01"};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string an 8-bit integer with
+  // value 255.
+  expected_output = "255";
+  input = std::istringstream{"\xC0\xFF"};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string a 16-bit integer with
+  // value 256.
+  expected_output = "256";
+  input = std::istringstream{"\xC1" + std::string("\x00", 1) + "\x01"};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string a 16-bit integer with
+  // value (2^16)-1 (65535).
+  expected_output = "65535";
+  input = std::istringstream{"\xC1\xFF\xFF"};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string a 32-bit integer with
+  // value 2^16 (65536).
+  expected_output = "65536";
+  input = std::istringstream{"\xC2" + std::string("\x00", 2) + "\x01" +
+                             std::string("\x00", 1)};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 11 and the string a 32-bit integer with
+  // value (2^32)-1.
+  expected_output = std::to_string((static_cast<std::uint64_t>(1) << 32) - 1);
+  input = std::istringstream{"\xC2\xFF\xFF\xFF\xFF"};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);

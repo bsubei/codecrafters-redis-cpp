@@ -3,6 +3,7 @@
 
 // System includes.
 #include <cstddef>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -24,6 +25,39 @@ std::string read_string_n_bytes(std::istream &is, const std::size_t num_bytes) {
     std::terminate();
   }
   return buf;
+}
+
+template <typename T> T bytes_to_int(const std::vector<std::byte> &bytes) {
+  T result;
+  // Copy over all the bytes and make a number out of it.
+  std::memcpy(&result, bytes.data(), sizeof(T));
+  // If we are big endian, we need to swap the bytes from little endian to big
+  // endian.
+  if constexpr (std::endian::native == std::endian::big) {
+    result = std::byteswap(result);
+  }
+  return result;
+}
+
+std::uint32_t read_int_n_bytes(std::istream &is, const std::size_t num_bytes) {
+  std::vector<std::byte> buf{};
+  buf.resize(num_bytes);
+  is.read(reinterpret_cast<char *>(buf.data()), num_bytes);
+  if (!is.good()) {
+    std::cerr << "Unable to read int with " << num_bytes << " bytes"
+              << std::endl;
+    std::terminate();
+  }
+  if (num_bytes == 1) {
+    return bytes_to_int<std::uint8_t>(buf);
+  } else if (num_bytes == 2) {
+    return bytes_to_int<std::uint16_t>(buf);
+  } else if (num_bytes == 4) {
+    return bytes_to_int<std::uint32_t>(buf);
+  } else {
+    std::cerr << "Unsupported num_bytes was given: " << num_bytes << std::endl;
+    std::terminate();
+  }
 }
 
 } // namespace
@@ -69,38 +103,27 @@ std::string parse_length_encoded_string(std::istream &is) {
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
   // covers lengths from 16384 to (2^32)-1.
   case 0b10: {
-    // NOTE: the next 4 bytes come in as little endian so we have to switch
-    // their order if our system uses big endian.
-    std::array<std::byte, 4> length_bytes{};
-    is.read(reinterpret_cast<char *>(length_bytes.data()), 4);
-    if (!is.good()) {
-      std::cerr << "Unable to read 4 length bytes" << std::endl;
-      std::terminate();
-    }
-    auto length = std::bit_cast<std::uint32_t>(length_bytes);
-    // If we are big endian, we need to swap the bytes from little endian to big
-    // endian.
-    if constexpr (std::endian::native == std::endian::big) {
-      length = std::byteswap(length);
-    }
+    const auto length = read_int_n_bytes(is, 4);
     return read_string_n_bytes(is, length);
   }
   // Special format. We only support "Integers as Strings". Expect 0, 1, or 2
   // in the remaining 6 bits.
   case 0b11: {
-    std::byte string_encoding_bits = length_encoding_bits & std::byte{0xFC};
-    // TODO finish
-
-    std::cout << "READING STRING ENCODING BITS : " << std::setfill('0')
-              << std::setw(2) << std::setbase(16)
-              << std::to_integer<int>(string_encoding_bits) << std::endl;
+    std::byte string_encoding_bits = length_byte & std::byte{0x3F};
+    std::size_t num_bytes_to_read = 0;
     switch (std::to_integer<std::uint8_t>(string_encoding_bits)) {
     // An 8 bit integer follows.
     case 0:
+      num_bytes_to_read = 1;
+      break;
     // A 16 bit integer follows.
     case 1:
+      num_bytes_to_read = 2;
+      break;
     // A 32 bit integer follows.
     case 2:
+      num_bytes_to_read = 4;
+      break;
     default:
       std::cerr << "Encountered unsupported string length encoding: "
                 << std::setbase(16)
@@ -108,6 +131,10 @@ std::string parse_length_encoded_string(std::istream &is) {
                 << std::endl;
       std::terminate();
     }
+    // Read the next N bytes as an integer (accounting for bytes coming in
+    // little-endian), and convert to a string.
+    std::uint32_t number = read_int_n_bytes(is, num_bytes_to_read);
+    return std::to_string(number);
   }
   default:
     std::cerr << "Encountered unknown length encoding: " << std::setbase(16)
