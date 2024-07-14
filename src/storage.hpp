@@ -58,6 +58,26 @@ struct RDB {
   EndOfFile eof{};
 };
 
+std::uint32_t parse_length_encoded_integer(std::istream &is);
 std::string parse_length_encoded_string(std::istream &is);
 RDB read_rdb(std::istream &is);
 Cache load_cache(const Config &config);
+
+// TODO We currently only support two kinds of string encodings:
+// 1. Strings with a length prefix.
+// 2. Special format "Integers as Strings", where you read 1, 2, or 4 bytes as
+// an int, then make it into a string. See
+// https://rdb.fnordig.de/file_format.html#string-encoding for details.
+using LengthPrefixedString = std::uint32_t;
+enum class IntAsString : std::uint8_t {
+  ONE_BYTE,
+  TWO_BYTES,
+  FOUR_BYTES,
+};
+using StringEncoding = std::variant<LengthPrefixedString, IntAsString>;
+StringEncoding parse_string_encoding(std::istream &is);
+
+// helper type to create visitors for the StringEncoding variant.
+template <class... Ts> struct StringEncodingVisitor : Ts... {
+  using Ts::operator()...;
+};

@@ -156,21 +156,17 @@ Metadata read_rdb_metadata(std::istream &is) {
 
   return metadata;
 }
-std::uint8_t read_db_number(std::istream &is) {
-  const std::uint8_t db_number = is.get();
-  if (!is.good()) {
-    std::cerr << "Unable to read RDB version in header" << std::endl;
-    std::terminate();
-  }
-  return db_number;
-}
 std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
   std::vector<DatabaseSection> db_sections{};
   // Read each database section
   while (is_opcode_section(RDB_DB_SELECTOR, is)) {
     DatabaseSection db_section{};
     // Double check that the db number it's saying we're in is the correct one.
-    const auto db_number = read_db_number(is);
+    const std::uint8_t db_number = is.get();
+    if (!is.good()) {
+      std::cerr << "Unable to read DB number" << std::endl;
+      std::terminate();
+    }
     if (db_number != db_sections.size()) {
       std::cerr << "Invalid db number encountered: "
                 << std::to_string(db_number) << std::endl;
@@ -181,10 +177,8 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
       std::cerr << "Expected RDB_RESIZE opcode" << std::endl;
       std::terminate();
     }
-    const std::uint32_t num_key_value_pairs =
-        std::stoul(parse_length_encoded_string(is));
-    const std::uint32_t num_expiry_pairs =
-        std::stoul(parse_length_encoded_string(is));
+    const std::uint32_t num_key_value_pairs = parse_length_encoded_integer(is);
+    const std::uint32_t num_expiry_pairs = parse_length_encoded_integer(is);
     std::uint32_t num_expiry_so_far = 0;
     // Now read that many key-value pairs.
     for (std::uint32_t i = 0; i < num_key_value_pairs; ++i) {
@@ -201,7 +195,7 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
       auto value_type = read_int_n_bytes<1>(is);
       // Read the string-encoded key.
       std::string key = parse_length_encoded_string(is);
-      // TODO we currently only support the "string encoding"
+      // TODO we currently only support the "string encoding" value type.
       if (value_type == 0) {
         // Read value encoded as string.
         std::string value = parse_length_encoded_string(is);
@@ -242,9 +236,9 @@ EndOfFile read_rdb_eof_section(std::istream &is) {
 
 } // namespace
 
-// TODO we only support string encodings, see
-// https://rdb.fnordig.de/file_format.html#string-encoding
-std::string parse_length_encoded_string(std::istream &is) {
+// Parse only the bytes needed to determine the encoding and return the
+// encoding.
+StringEncoding parse_string_encoding(std::istream &is) {
   // Read the first byte, and use that to discover what encoding we need to use.
   std::uint8_t l = is.get();
   if (!is.good()) {
@@ -261,7 +255,7 @@ std::string parse_length_encoded_string(std::istream &is) {
   case 0b00: {
     const std::uint8_t length =
         std::to_integer<std::uint8_t>(length_byte & (~LENGTH_ENCODING_MASK));
-    return read_string_n_bytes(is, length);
+    return LengthPrefixedString{length};
   }
   // Read one additional byte. The combined 14 bits represent the length. This
   // covers lengths from 64 to 16383.
@@ -278,13 +272,13 @@ std::string parse_length_encoded_string(std::istream &is) {
         std::to_integer<std::uint16_t>(length_byte & ~LENGTH_ENCODING_MASK);
     std::uint16_t length =
         (most_significant_byte << 8) | least_significant_byte;
-    return read_string_n_bytes(is, length);
+    return LengthPrefixedString{length};
   }
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
   // covers lengths from 16384 to (2^32)-1.
   case 0b10: {
     const auto length = read_int_n_bytes<4>(is);
-    return read_string_n_bytes(is, length);
+    return LengthPrefixedString{length};
   }
   // Special format. We only support "Integers as Strings". Expect 0, 1, or 2
   // in the remaining 6 bits.
@@ -293,16 +287,13 @@ std::string parse_length_encoded_string(std::istream &is) {
     switch (std::to_integer<std::uint8_t>(string_encoding_bits)) {
     // An 8 bit integer follows.
     case 0:
-      // Read the next 1 byte as an integer, and convert to a string.
-      return std::to_string(read_int_n_bytes<1>(is));
+      return IntAsString::ONE_BYTE;
     // A 16 bit integer follows.
     case 1:
-      // Same but two bytes instead of one.
-      return std::to_string(read_int_n_bytes<2>(is));
+      return IntAsString::TWO_BYTES;
     // A 32 bit integer follows.
     case 2:
-      // Same but four bytes instead of one.
-      return std::to_string(read_int_n_bytes<4>(is));
+      return IntAsString::FOUR_BYTES;
     default:
       std::cerr << "Encountered unsupported string length encoding: "
                 << std::setbase(16)
@@ -318,6 +309,52 @@ std::string parse_length_encoded_string(std::istream &is) {
     std::terminate();
   }
   return {};
+}
+std::uint32_t parse_length_encoded_integer(std::istream &is) {
+  // Parsing a length-encoded integer is just like that of a string, except the
+  // length of the string ends up being the integer we want, so we can just
+  // return that.
+  const auto encoding = parse_string_encoding(is);
+  if (!std::holds_alternative<LengthPrefixedString>(encoding)) {
+    std::cerr
+        << "Cannot parse integer using encoding other than length prefixed"
+        << std::endl;
+    std::terminate();
+  }
+  return std::get<LengthPrefixedString>(encoding);
+}
+std::string parse_length_encoded_string(std::istream &is) {
+  // Determine the kind of encoding (includes how many bytes to read).
+  const auto string_encoding = parse_string_encoding(is);
+  // Now read that many bytes depending on the encoding.
+  return std::visit(StringEncodingVisitor{
+                        [&is](const LengthPrefixedString &l) {
+                          return read_string_n_bytes(is, l);
+                        },
+                        [&is](const IntAsString &o) {
+                          // Read the next N bytes as an integer, and convert to
+                          // a string.
+                          if (o == IntAsString::ONE_BYTE) {
+                            return std::to_string(read_int_n_bytes<1>(is));
+                          } else if (o == IntAsString::TWO_BYTES) {
+                            return std::to_string(read_int_n_bytes<2>(is));
+                          } else if (o == IntAsString::FOUR_BYTES) {
+                            return std::to_string(read_int_n_bytes<4>(is));
+                          } else {
+                            std::cerr
+                                << "Unknown IntAsString enum: "
+                                << std::to_string(static_cast<std::uint8_t>(o))
+                                << std::endl;
+                            std::terminate();
+                          }
+                        },
+                        [](const auto &) {
+                          std::cerr << "Unknown StringEncoding variant"
+                                    << std::endl;
+                          std::terminate();
+                        },
+                    },
+                    string_encoding);
 }
 RDB read_rdb(std::istream &is) {
   // Read these sections in this particular sequence.
