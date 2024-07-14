@@ -39,9 +39,6 @@ std::string parse_length_encoded_string(std::istream &is) {
   }
   std::byte length_byte = std::byte(static_cast<std::uint8_t>(l));
 
-  std::cout << "READING LENGTH BYTE: " << std::setfill('0') << std::setw(2)
-            << std::setbase(16) << l << std::endl;
-
   const std::byte length_encoding_bits =
       (length_byte & LENGTH_ENCODING_MASK) >> 6;
   switch (std::to_integer<std::uint8_t>(length_encoding_bits)) {
@@ -50,7 +47,6 @@ std::string parse_length_encoded_string(std::istream &is) {
   case 0b00: {
     const std::uint8_t length =
         std::to_integer<std::uint8_t>(length_byte & (~LENGTH_ENCODING_MASK));
-    std::cout << "TURNS OUT LENGTH IS: " << std::to_string(length) << std::endl;
     return read_string_n_bytes(is, length);
   }
   // Read one additional byte. The combined 14 bits represent the length. This
@@ -61,14 +57,13 @@ std::string parse_length_encoded_string(std::istream &is) {
       std::cerr << "Unable to read second length byte" << std::endl;
       std::terminate();
     }
-    // The most significant byte was the first byte (because the data is in
-    // little endian order), and the least significant byte was the second byte
-    // we read.
+    // The most significant byte was the first byte we read, and the least
+    // significant byte was the second byte we read, because the data arrived in
+    // little endian order.
     const auto most_significant_byte =
         std::to_integer<std::uint16_t>(length_byte & ~LENGTH_ENCODING_MASK);
     std::uint16_t length =
         (most_significant_byte << 8) | least_significant_byte;
-    std::cout << "TURNS OUT LENGTH IS: " << std::to_string(length) << std::endl;
     return read_string_n_bytes(is, length);
   }
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
@@ -95,6 +90,10 @@ std::string parse_length_encoded_string(std::istream &is) {
   case 0b11: {
     std::byte string_encoding_bits = length_encoding_bits & std::byte{0xFC};
     // TODO finish
+
+    std::cout << "READING STRING ENCODING BITS : " << std::setfill('0')
+              << std::setw(2) << std::setbase(16)
+              << std::to_integer<int>(string_encoding_bits) << std::endl;
     switch (std::to_integer<std::uint8_t>(string_encoding_bits)) {
     // An 8 bit integer follows.
     case 0:

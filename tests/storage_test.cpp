@@ -36,31 +36,74 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // as a c-str null char.
   std::istringstream input{std::string{"\x00", 1}};
   std::string expected_output = "";
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  std::string actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 
   // Test case: length encoding bits are 00 and length is one.
   input = std::istringstream{"\x01S"};
   expected_output = "S";
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 
   // Test case: length encoding bits are 00 and length is 12.
   input = std::istringstream{"\x0Cqwertydvorak"};
   expected_output = "qwertydvorak";
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 
   // Test case: length encoding bits are 00 and length is 63 (the edge
   // case).
   expected_output = get_random_string_n_bytes(63);
   input = std::istringstream{"\x3F" + expected_output};
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 
   // Test case: length encoding bits are 01 and length is 64 (edge case).
   expected_output = get_random_string_n_bytes(64);
   input = std::istringstream{"\x40\x40" + expected_output};
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 
-  // Test case: length encoding bits are 01 and length is 700.
+  // Test case: length encoding bits are 01 and length is 700. If we drop the
+  // top two bits (the '4'), we get 0x02BC, which is 700.
   expected_output = get_random_string_n_bytes(700);
   input = std::istringstream{"\x42\xBC" + expected_output};
-  EXPECT_EQ(parse_length_encoded_string(input), expected_output);
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 01 and length is 16383. If we drop the
+  // top two bits, the remaining 14 bits are 0x3FFF, which is 16383.
+  expected_output = get_random_string_n_bytes(16383);
+  input = std::istringstream{"\x7F\xFF" + expected_output};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 10 and length is 16384.
+  // The first byte "\x80" has length encoding bits 10 (the rest of the byte is
+  // discarded). The next four bytes come in little-endian and make up the
+  // length 16384 (which is the same as the swapped bytes: 0x00004000).
+  expected_output = get_random_string_n_bytes(16384);
+  input = std::istringstream{"\x80" + std::string{"\x00", 1} + "\x40" +
+                             std::string{"\x00", 2} + expected_output};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
+
+  // Test case: length encoding bits are 10 and length is 17000.
+  // The first byte "\x80" has length encoding bits 10 (the rest of the byte is
+  // discarded). The next four bytes come in little-endian and make up the
+  // length 17000 (which is the same as the swapped bytes: 0x00004268).
+  expected_output = get_random_string_n_bytes(17000);
+  input = std::istringstream{"\x80\x68\x42" + std::string{"\x00", 2} +
+                             expected_output};
+  actual_output = parse_length_encoded_string(input);
+  EXPECT_EQ(actual_output.size(), expected_output.size());
+  EXPECT_EQ(actual_output, expected_output);
 }
