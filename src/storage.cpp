@@ -68,18 +68,97 @@ decltype(auto) read_int_n_bytes(std::istream &is) {
   return bytes_to_int<num_bytes>(buf);
 }
 
+// If the next byte is the given opcode, consume it and return true. Otherwise,
+// just return false.
+bool is_opcode_section(const std::byte opcode, std::istream &is) {
+  if (std::byte(is.peek()) == opcode) {
+    // Consume the opcode byte.
+    is.get();
+    if (!is.good()) {
+      std::cerr << "Unable to read opcode section: " << std::setbase(16)
+                << std::to_integer<std::uint8_t>(opcode) << std::endl;
+      std::terminate();
+    }
+    return true;
+  }
+  return false;
+}
+
+Header read_rdb_header(std::istream &is) {
+  std::string buf{};
+  buf.resize(5);
+  is.read(buf.data(), 5);
+  if (!is.good() || buf != RDB_MAGIC) {
+    std::cerr << "Unable to read magic '" << RDB_MAGIC << "' in header"
+              << std::endl;
+    std::terminate();
+  }
+
+  buf.clear();
+  buf.resize(4);
+  is.read(buf.data(), 4);
+  if (!is.good()) {
+    std::cerr << "Unable to read RDB version in header" << std::endl;
+    std::terminate();
+  }
+
+  std::uint8_t version = std::stoul(buf);
+  if (version < MIN_SUPPORTED_RDB_VERSION) {
+    std::cerr << "RDB version is too old: " << std::to_string(version)
+              << std::endl;
+    std::terminate();
+  }
+
+  return Header{.version = version};
+}
+
+Metadata read_rdb_metadata(std::istream &is) {
+  Metadata metadata{};
+  // Keep reading key-value pairs until we no longer see the Metadata opcode.
+  while (is_opcode_section(RDB_AUX, is)) {
+    // Read a string-encoded key.
+    const std::string key = parse_length_encoded_string(is);
+    // Read a string-encoded value.
+    const std::string value = parse_length_encoded_string(is);
+    // Manually set the metadata fields.
+    if (key == "ctime") {
+      metadata.creation_time = std::stoul(value);
+    } else if (key == "used-mem") {
+      metadata.used_memory = std::stoul(value);
+    } else if (key == "redis-bits") {
+      auto num_bits = std::stoul(value);
+      if (num_bits == 32) {
+        metadata.redis_num_bits = NumBits::ARCHITECTURE_32_BITS;
+      } else if (num_bits == 64) {
+        metadata.redis_num_bits = NumBits::ARCHITECTURE_64_BITS;
+      } else {
+        std::cerr << "Encountered unsupported number of bits in metadata: "
+                  << std::to_string(num_bits) << std::endl;
+        std::terminate();
+      }
+    } else if (key == "redis-ver") {
+      metadata.redis_version = value;
+    } else {
+      std::cout << "Encountered unknown Metadata key and value pair: (" << key
+                << ", " << value << ")" << std::endl;
+    }
+  }
+
+  return metadata;
+}
+
 } // namespace
 
 // TODO we only support string encodings, see
 // https://rdb.fnordig.de/file_format.html#string-encoding
 std::string parse_length_encoded_string(std::istream &is) {
   // Read the first byte, and use that to discover what encoding we need to use.
-  int l = is.get();
+  std::uint8_t l = is.get();
   if (!is.good()) {
     std::cerr << "Unable to read length byte" << std::endl;
     std::terminate();
   }
-  std::byte length_byte = std::byte(static_cast<std::uint8_t>(l));
+  std::byte length_byte = std::byte(l);
 
   const std::byte length_encoding_bits =
       (length_byte & LENGTH_ENCODING_MASK) >> 6;
@@ -134,7 +213,7 @@ std::string parse_length_encoded_string(std::istream &is) {
     default:
       std::cerr << "Encountered unsupported string length encoding: "
                 << std::setbase(16)
-                << (std::to_integer<std::uint8_t>(string_encoding_bits))
+                << std::to_integer<std::uint8_t>(string_encoding_bits)
                 << std::endl;
       std::terminate();
     }
@@ -160,6 +239,29 @@ Cache read_cache_from_rdb(const Config &config) {
       std::terminate();
     }
 
+    // TODO currently we don't do anything with the version besides check if
+    // it's too old and print it out.
+    auto header = read_rdb_header(file_contents);
+    std::cout << "HEADER VERSION: " << std::to_string(header.version)
+              << std::endl;
+
+    auto metadata = read_rdb_metadata(file_contents);
+    std::cout << "METADATA: " << std::endl;
+    if (metadata.creation_time) {
+      std::cout << "\tcreation_time: " << *metadata.creation_time << std::endl;
+    }
+    if (metadata.used_memory) {
+      std::cout << "\tused_memory: " << *metadata.used_memory << std::endl;
+    }
+    if (metadata.redis_version) {
+      std::cout << "\tredis_version: " << *metadata.redis_version << std::endl;
+    }
+    if (metadata.redis_num_bits) {
+      std::cout << "\tredis_num_bits: "
+                << std::to_string(
+                       static_cast<std::uint8_t>(*metadata.redis_num_bits))
+                << std::endl;
+    }
     // TODO Parse the file contents (only the key-value cache data for now).
   }
 

@@ -22,12 +22,13 @@ constexpr std::byte RDB_EXPIRE_TIME_S{0xFD};
 constexpr std::byte RDB_EXPIRE_TIME_MS{0xFC};
 constexpr std::byte RDB_RESIZE{0xFB};
 constexpr std::byte RDB_AUX{0xFA}; // Auxiliary fields (AKA metadata fields).
-// TODO we only support version 7 exactly.
-constexpr auto RDB_MAGIC = "REDIS0007";
+constexpr auto RDB_MAGIC = "REDIS";
+// If we detect the RDB file has a version lower than this, we bail.
+constexpr auto MIN_SUPPORTED_RDB_VERSION = 7;
 // The two most-significant bits encode the length.
 constexpr std::byte LENGTH_ENCODING_MASK{0b11000000};
 
-enum class NumBits {
+enum class NumBits : std::uint8_t {
   ARCHITECTURE_32_BITS,
   ARCHITECTURE_64_BITS,
 };
@@ -38,7 +39,7 @@ struct Header {
 struct Metadata {
   std::optional<std::uint64_t> creation_time{};
   std::optional<std::uint64_t> used_memory{}; // TODO units?
-  std::optional<std::uint8_t> redis_version{};
+  std::optional<std::string> redis_version{};
   std::optional<NumBits> redis_num_bits{};
 };
 struct DatabaseSection {
