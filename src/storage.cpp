@@ -2,11 +2,13 @@
 #include "storage.hpp"
 
 // System includes.
+#include <cassert>
 #include <cstddef>
 #include <cstring>
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <utility>
 
 // Our library's header includes.
 #include "config.hpp"
@@ -154,6 +156,89 @@ Metadata read_rdb_metadata(std::istream &is) {
 
   return metadata;
 }
+std::uint8_t read_db_number(std::istream &is) {
+  const std::uint8_t db_number = is.get();
+  if (!is.good()) {
+    std::cerr << "Unable to read RDB version in header" << std::endl;
+    std::terminate();
+  }
+  return db_number;
+}
+std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
+  std::vector<DatabaseSection> db_sections{};
+  // Read each database section
+  while (is_opcode_section(RDB_DB_SELECTOR, is)) {
+    DatabaseSection db_section{};
+    // Double check that the db number it's saying we're in is the correct one.
+    const auto db_number = read_db_number(is);
+    if (db_number != db_sections.size()) {
+      std::cerr << "Invalid db number encountered: "
+                << std::to_string(db_number) << std::endl;
+      std::terminate();
+    }
+    // Expect the hash table size section and read the sizes.
+    if (!is_opcode_section(RDB_RESIZE, is)) {
+      std::cerr << "Expected RDB_RESIZE opcode" << std::endl;
+      std::terminate();
+    }
+    const std::uint32_t num_key_value_pairs =
+        std::stoul(parse_length_encoded_string(is));
+    const std::uint32_t num_expiry_pairs =
+        std::stoul(parse_length_encoded_string(is));
+    std::uint32_t num_expiry_so_far = 0;
+    // Now read that many key-value pairs.
+    for (std::uint32_t i = 0; i < num_key_value_pairs; ++i) {
+      Cache::ExpiryValueT expiry{std::nullopt};
+      // Check for a possible expiry prefix.
+      if (is_opcode_section(RDB_EXPIRE_TIME_S, is)) {
+        expiry.emplace(std::chrono::seconds(read_int_n_bytes<4>(is)));
+        ++num_expiry_so_far;
+      } else if (is_opcode_section(RDB_EXPIRE_TIME_MS, is)) {
+        expiry.emplace(std::chrono::milliseconds(read_int_n_bytes<8>(is)));
+        ++num_expiry_so_far;
+      }
+      // Read the value type.
+      auto value_type = read_int_n_bytes<1>(is);
+      // Read the string-encoded key.
+      std::string key = parse_length_encoded_string(is);
+      // TODO we currently only support the "string encoding"
+      if (value_type == 0) {
+        // Read value encoded as string.
+        std::string value = parse_length_encoded_string(is);
+        // Finally, we can populate this key-value pair possibly with an expiry.
+        db_section.data.emplace(key, Cache::EntryT{value, expiry});
+
+      } else {
+        std::cerr << "Got unsupported value type: "
+                  << std::to_string(value_type) << std::endl;
+        std::terminate();
+      }
+    }
+    // When done reading all the key-value pairs, save this DB section and move
+    // on to the next one.
+    db_sections.push_back(db_section);
+
+    // Double-check that the promised number of expiry pairs were seen.
+    assert(num_expiry_so_far == num_expiry_pairs &&
+           "Mismatching num expiry pairs");
+  }
+  return db_sections;
+}
+EndOfFile read_rdb_eof_section(std::istream &is) {
+  if (is_opcode_section(RDB_EOF, is)) {
+    // TODO compute the actual CRC of the entire stream from start to this point
+    // so we can compare it. Read the recorded CRC.
+    std::array<std::uint8_t, 8> buf{};
+    is.read(reinterpret_cast<char *>(buf.data()), 8);
+    if (!is.good()) {
+      std::cerr << "Unable to read CRC 8 bytes" << std::endl;
+      std::terminate();
+    }
+    return EndOfFile{.crc64 = buf};
+  }
+  std::cerr << "Unable to read End of File section" << std::endl;
+  std::terminate();
+}
 
 } // namespace
 
@@ -235,37 +320,15 @@ std::string parse_length_encoded_string(std::istream &is) {
   return {};
 }
 RDB read_rdb(std::istream &is) {
-  // TODO currently we don't do anything with the version besides check if
-  // it's too old and print it out.
+  // Read these sections in this particular sequence.
   auto header = read_rdb_header(is);
-  std::cout << "HEADER VERSION: " << std::to_string(header.version)
-            << std::endl;
-
   auto metadata = read_rdb_metadata(is);
-  std::cout << "METADATA: " << std::endl;
-  if (metadata.creation_time) {
-    std::cout << "\tcreation_time: " << *metadata.creation_time << std::endl;
-  }
-  if (metadata.used_memory) {
-    std::cout << "\tused_memory: " << *metadata.used_memory << std::endl;
-  }
-  if (metadata.redis_version) {
-    std::cout << "\tredis_version: " << *metadata.redis_version << std::endl;
-  }
-  if (metadata.redis_num_bits) {
-    std::cout << "\tredis_num_bits: "
-              << std::to_string(
-                     static_cast<std::uint8_t>(*metadata.redis_num_bits))
-              << std::endl;
-  }
-  // TODO Parse the database sections
-
-  // TODO Parse the EndOfFile section
-
+  auto db_sections = read_rdb_database_sections(is);
+  auto eof_section = read_rdb_eof_section(is);
   return RDB{.header = header,
              .metadata = metadata,
-             .database_sections = {},
-             .eof = {}};
+             .database_sections = db_sections,
+             .eof = eof_section};
 }
 
 Cache load_cache(const Config &config) {
