@@ -12,6 +12,7 @@
 
 // Our library's header includes.
 #include "config.hpp"
+#include "time.hpp"
 
 namespace {
 
@@ -184,10 +185,16 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
       Cache::ExpiryValueT expiry{std::nullopt};
       // Check for a possible expiry prefix.
       if (is_opcode_section(RDB_EXPIRE_TIME_S, is)) {
-        expiry.emplace(std::chrono::seconds(read_int_n_bytes<4>(is)));
+        // Convert the expiry timestamp to our steady_clock representation so
+        // we're immune to random jumps in time.
+        expiry = unix_timestamp_to_steady_clock<std::chrono::seconds>(
+            read_int_n_bytes<4>(is));
         ++num_expiry_so_far;
       } else if (is_opcode_section(RDB_EXPIRE_TIME_MS, is)) {
-        expiry.emplace(std::chrono::milliseconds(read_int_n_bytes<8>(is)));
+        // Convert the expiry timestamp to our steady_clock representation so
+        // we're immune to random jumps in time.
+        expiry = unix_timestamp_to_steady_clock<std::chrono::milliseconds>(
+            read_int_n_bytes<8>(is));
         ++num_expiry_so_far;
       }
       // Read the value type.

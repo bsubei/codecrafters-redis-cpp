@@ -75,3 +75,6 @@ Message generate_response_message(const Command &command, const Config &config,
                                   Cache &cache);
 
 std::string command_to_string(CommandVerb command);
+
+// Handle any state changes we need to do before replying to the client.
+void handle_command(const Command &command, Cache &cache);

@@ -1,35 +1,18 @@
 // This source file's own header include.
 #include "redis_server.hpp"
 
-// Our library's header includes.
-#include "network.hpp"
-#include "redis_core.hpp"
-#include "storage.hpp"
-
 // System includes.
 #include <cassert>
 #include <chrono>
 #include <iostream>
 #include <unistd.h>
 
+// Our library's header includes.
+#include "network.hpp"
+#include "redis_core.hpp"
+#include "storage.hpp"
+
 namespace {
-
-void handle_command(const Command &command, Cache &cache) {
-  // Handle any state changes we need to do before replying to the client.
-  // The SET command has the side-effect of updating the given key-value pairs
-  // in our cache/db.
-  if (command.verb == CommandVerb::Set) {
-    const auto &key = command.arguments.front();
-    const auto &value = command.arguments[1];
-    std::optional<std::chrono::milliseconds> expiry{};
-    if (command.arguments.size() == 4 && command.arguments[2] == "px") {
-      auto num = std::stoi(command.arguments[3]);
-      expiry = std::chrono::milliseconds(num);
-    }
-
-    cache.set(key, value, expiry);
-  }
-}
 
 void handle_client_connection(const int client_fd, const Config &config,
                               Cache &cache) {

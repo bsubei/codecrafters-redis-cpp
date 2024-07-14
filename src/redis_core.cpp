@@ -245,3 +245,18 @@ std::string command_to_string(CommandVerb command) {
     std::terminate();
   }
 }
+void handle_command(const Command &command, Cache &cache) {
+  // The SET command has the side-effect of updating the given key-value pairs
+  // in our cache/db.
+  if (command.verb == CommandVerb::Set) {
+    const auto &key = command.arguments.front();
+    const auto &value = command.arguments[1];
+    std::optional<std::chrono::milliseconds> expiry{};
+    if (command.arguments.size() == 4 && command.arguments[2] == "px") {
+      auto num = std::stoul(command.arguments[3]);
+      expiry = std::chrono::milliseconds(num);
+    }
+
+    cache.set(key, value, expiry);
+  }
+}

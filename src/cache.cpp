@@ -4,6 +4,9 @@
 // System includes.
 #include <algorithm>
 
+// Our library's header includes.
+#include "time.hpp"
+
 // TODO clean up any expired cache elements we try to access so we don't waste
 // time checking their expiry next time around.
 // TODO eventually have the server actively go around testing for expired values
@@ -29,6 +32,8 @@ void Cache::set(
     const std::optional<std::chrono::milliseconds> &expiry_duration) {
   ExpiryValueT expiry_time = std::nullopt;
   if (expiry_duration.has_value()) {
+    // When expiry time is set manually, it's sent as a duration (as in, it
+    // should expire after this much time from now).
     expiry_time = std::chrono::steady_clock::now() + expiry_duration.value();
   }
   // Acquire a unique lock, blocking out every other read/write, because we're
