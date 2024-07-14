@@ -166,12 +166,50 @@ TEST(StorageTest, ParseLengthEncodedString) {
 }
 
 TEST(StorageTest, ReadRDB) {
-  // TODO have a hardcoded RDB file as a constant here and load it into the
-  // istream.
+  /*
+  Read a hardcoded RDB file and expect that we parsed it correctly.
+  This RDB file looks like this in hexdump:
+    |REDIS0009..redis|
+    |-ver.5.0.7..redi|
+    |s-bits.@..ctime.|
+    |u..f..used-mem..|
+    |&....aof-preambl|
+    |e.........mykey.|
+    |myval...w-_.-||
+  The header has version 9.
+  The metadata has 5 key-value pairs.
+  The database section has one key (mykey) and one value (myval).
+  */
+  std::vector<std::uint8_t> rdb_bytes = {
+      0x52, 0x45, 0x44, 0x49, 0x53, 0x30, 0x30, 0x30, 0x39, 0xfa, 0x09,
+      0x72, 0x65, 0x64, 0x69, 0x73, 0x2d, 0x76, 0x65, 0x72, 0x05, 0x35,
+      0x2e, 0x30, 0x2e, 0x37, 0xfa, 0x0a, 0x72, 0x65, 0x64, 0x69, 0x73,
+      0x2d, 0x62, 0x69, 0x74, 0x73, 0xc0, 0x40, 0xfa, 0x05, 0x63, 0x74,
+      0x69, 0x6d, 0x65, 0xc2, 0x75, 0xd3, 0x92, 0x66, 0xfa, 0x08, 0x75,
+      0x73, 0x65, 0x64, 0x2d, 0x6d, 0x65, 0x6d, 0xc2, 0xf8, 0x26, 0x0c,
+      0x00, 0xfa, 0x0c, 0x61, 0x6f, 0x66, 0x2d, 0x70, 0x72, 0x65, 0x61,
+      0x6d, 0x62, 0x6c, 0x65, 0xc0, 0x00, 0xfe, 0x00, 0xfb, 0x01, 0x00,
+      0x00, 0x05, 0x6d, 0x79, 0x6b, 0x65, 0x79, 0x05, 0x6d, 0x79, 0x76,
+      0x61, 0x6c, 0xff, 0xcc, 0xf7, 0x77, 0x2d, 0x5f, 0x89, 0x2d, 0x7c,
+  };
 
-  std::istringstream is{""};
-
-  // auto rdb = read_rdb(is);
-  // TODO test we can read and parse the RDB.
-  // EXPECT_EQ()
+  // NOTE: we have to create a std::string out of it because we want to be able
+  // to explicitly give it the size, otherwise it treats the 0x00 bytes an null
+  // char terminators and we end up with a shorter string than we should.
+  const std::string rdb_string(reinterpret_cast<const char *>(rdb_bytes.data()),
+                               rdb_bytes.size());
+  std::istringstream is{rdb_string};
+  const auto rdb = read_rdb(is);
+  EXPECT_EQ(rdb.header.version, 9);
+  EXPECT_EQ(rdb.metadata.redis_version, "5.0.7");
+  EXPECT_EQ(rdb.metadata.redis_num_bits, NumBits::ARCHITECTURE_64_BITS);
+  EXPECT_EQ(rdb.metadata.creation_time, 1720898421);
+  EXPECT_EQ(rdb.metadata.used_memory, 796408);
+  ASSERT_EQ(rdb.database_sections.size(), 1);
+  ASSERT_EQ(rdb.database_sections.front().data.size(), 1);
+  ASSERT_TRUE(rdb.database_sections.front().data.contains("mykey"));
+  ASSERT_EQ(rdb.database_sections.front().data.at("mykey").first, "myval");
+  EXPECT_EQ(rdb.eof.crc64,
+            (std::array<std::uint8_t, 8>{0xcc, 0xf7, 0x77, 0x2d, 0x5f, 0x89,
+                                         0x2d, 0x7c}));
 }

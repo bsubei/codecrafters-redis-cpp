@@ -262,7 +262,10 @@ RDB read_rdb(std::istream &is) {
 
   // TODO Parse the EndOfFile section
 
-  return {};
+  return RDB{.header = header,
+             .metadata = metadata,
+             .database_sections = {},
+             .eof = {}};
 }
 
 Cache load_cache(const Config &config) {
