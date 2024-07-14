@@ -164,3 +164,14 @@ TEST(StorageTest, ParseLengthEncodedString) {
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);
 }
+
+TEST(StorageTest, ReadRDB) {
+  // TODO have a hardcoded RDB file as a constant here and load it into the
+  // istream.
+
+  std::istringstream is{""};
+
+  // auto rdb = read_rdb(is);
+  // TODO test we can read and parse the RDB.
+  // EXPECT_EQ()
+}

@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <istream>
 #include <optional>
 #include <unordered_map>
@@ -58,4 +59,5 @@ struct RDB {
 };
 
 std::string parse_length_encoded_string(std::istream &is);
-Cache read_cache_from_rdb(const Config &config);
+RDB read_rdb(std::istream &is);
+Cache load_cache(const Config &config);

@@ -6,13 +6,21 @@
 #include <cstring>
 #include <exception>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 
 // Our library's header includes.
 #include "config.hpp"
 
 namespace {
+
+std::ifstream read_file(const std::filesystem::path &filepath) {
+  std::ifstream file_contents(filepath, std::ios::binary);
+  if (!file_contents) {
+    std::cerr << "Failed to read file contents at: " << filepath << std::endl;
+    std::terminate();
+  }
+  return file_contents;
+}
 
 std::string read_string_n_bytes(std::istream &is, const std::size_t num_bytes) {
   // Read the rest of the string and return it.
@@ -226,44 +234,56 @@ std::string parse_length_encoded_string(std::istream &is) {
   }
   return {};
 }
+RDB read_rdb(std::istream &is) {
+  // TODO currently we don't do anything with the version besides check if
+  // it's too old and print it out.
+  auto header = read_rdb_header(is);
+  std::cout << "HEADER VERSION: " << std::to_string(header.version)
+            << std::endl;
 
-Cache read_cache_from_rdb(const Config &config) {
+  auto metadata = read_rdb_metadata(is);
+  std::cout << "METADATA: " << std::endl;
+  if (metadata.creation_time) {
+    std::cout << "\tcreation_time: " << *metadata.creation_time << std::endl;
+  }
+  if (metadata.used_memory) {
+    std::cout << "\tused_memory: " << *metadata.used_memory << std::endl;
+  }
+  if (metadata.redis_version) {
+    std::cout << "\tredis_version: " << *metadata.redis_version << std::endl;
+  }
+  if (metadata.redis_num_bits) {
+    std::cout << "\tredis_num_bits: "
+              << std::to_string(
+                     static_cast<std::uint8_t>(*metadata.redis_num_bits))
+              << std::endl;
+  }
+  // TODO Parse the database sections
+
+  // TODO Parse the EndOfFile section
+
+  return {};
+}
+
+Cache load_cache(const Config &config) {
   if (config.dbfilename && config.dir) {
     const auto filepath = std::filesystem::path(*config.dir) /
                           std::filesystem::path(*config.dbfilename);
     std::cout << "Reading RDB from file: " << filepath << std::endl;
-
-    std::ifstream file_contents(filepath, std::ios::binary);
-    if (!file_contents) {
-      std::cerr << "Failed to read file contents at: " << filepath << std::endl;
+    auto file_contents = read_file(filepath);
+    auto rdb = read_rdb(file_contents);
+    if (rdb.database_sections.size() == 0) {
+      std::cerr
+          << "Expected to find at least one Database section in RDB file: "
+          << filepath << std::endl;
       std::terminate();
+    } else {
+      if (rdb.database_sections.size() > 1) {
+        std::cout << "Found more than one database sections: "
+                  << rdb.database_sections.size() << std::endl;
+      }
+      return Cache(rdb.database_sections.front().data);
     }
-
-    // TODO currently we don't do anything with the version besides check if
-    // it's too old and print it out.
-    auto header = read_rdb_header(file_contents);
-    std::cout << "HEADER VERSION: " << std::to_string(header.version)
-              << std::endl;
-
-    auto metadata = read_rdb_metadata(file_contents);
-    std::cout << "METADATA: " << std::endl;
-    if (metadata.creation_time) {
-      std::cout << "\tcreation_time: " << *metadata.creation_time << std::endl;
-    }
-    if (metadata.used_memory) {
-      std::cout << "\tused_memory: " << *metadata.used_memory << std::endl;
-    }
-    if (metadata.redis_version) {
-      std::cout << "\tredis_version: " << *metadata.redis_version << std::endl;
-    }
-    if (metadata.redis_num_bits) {
-      std::cout << "\tredis_num_bits: "
-                << std::to_string(
-                       static_cast<std::uint8_t>(*metadata.redis_num_bits))
-                << std::endl;
-    }
-    // TODO Parse the file contents (only the key-value cache data for now).
   }
-
-  return {};
+  return Cache{};
 };
