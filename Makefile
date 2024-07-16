@@ -15,6 +15,7 @@ debug:
 	mkdir -p $(BUILD_DIR)/debug
 	cd $(BUILD_DIR)/debug && cmake -DCMAKE_BUILD_TYPE=Debug \
 		-DCMAKE_CXX_FLAGS_DEBUG="-O0 -g -gdwarf-4 -fno-omit-frame-pointer" \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
 		../..
 	cmake --build $(BUILD_DIR)/debug --parallel
 

@@ -46,3 +46,9 @@ _deps
 
 build/
 vcpkg_installed
+
+# clangd cache
+.cache/
+
+# codechecker cache
+.codechecker/

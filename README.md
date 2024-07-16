@@ -30,6 +30,9 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [x] use blacklists to get msan and tsan to shut up about CLI11
 - [ ] move all the flags from make to cmake
 - [ ] figure out a way to fix false-positives in msan (need to build and instrument my own libc, see [here](https://clang.llvm.org/docs/MemorySanitizer.html#handling-external-code)).
+    - Can probably ditch msan and just use valgrind.
+- [x] install and start using clang-tidy (part of clangd in vscode) as well as clang static analyzer and cppcheck (part of codechecker in vscode).
+- [ ] clean up all the warnings and errors from the above static analysis tools.
 
 # Progress Log
 
@@ -51,5 +54,12 @@ I'm doing a rehaul of the parser.
 - [x] remove unnecessary header includes
 - [x] one last thing: need to run in all the sanitizer modes and fix issues
 
+Rehaul is done.
+
 ## RDB (persistence)
 Just starting out on the RDB challenge. The goal is to have be able to save the db to disk (and read it when starting up).
+
+Finished reading basic RDB. Things I skipped:
+- All encodings except for length-prefixed string and IntAsString.
+- Actually checking the CRC against the data I'm reading.
+- Parsing wildcard in GET and CONFIG GET commands.
