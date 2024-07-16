@@ -7,6 +7,7 @@ Checks: >
   -llvm*,
   -altera-*,
   -hicpp-braces-around-statements,
+  -readability-avoid-const-params-in-decls,
   -readability-braces-around-statements,
   -cppcoreguidelines-avoid-magic-numbers,
   -readability-magic-numbers,

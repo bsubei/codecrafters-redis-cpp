@@ -3,9 +3,7 @@
 
 // System includes.
 #include <algorithm>
-
-// Our library's header includes.
-#include "time.hpp"
+#include <mutex>
 
 // TODO clean up any expired cache elements we try to access so we don't waste
 // time checking their expiry next time around.
@@ -49,6 +47,6 @@ std::vector<std::string> Cache::keys() const {
   std::vector<std::string> keys{};
   keys.reserve(data.size());
   std::transform(data.cbegin(), data.cend(), std::back_inserter(keys),
-                 [](const auto &e) { return e.first; });
+                 [](const auto &cache_entry) { return cache_entry.first; });
   return keys;
 }

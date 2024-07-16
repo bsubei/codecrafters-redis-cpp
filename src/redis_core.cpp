@@ -9,7 +9,6 @@
 // Our library's header includes.
 #include "cache.hpp"
 #include "config.hpp"
-#include "utils.hpp"
 
 namespace {
 // NOTE: we return a reference to one of the strings inside the given message
@@ -22,9 +21,9 @@ const std::string &get_first_elem(const Message &message) {
               -> const std::string & {
             const auto &first_message = message_data.front();
             assert(std::holds_alternative<Message::StringVariantT>(
-                       first_message.data) &&
+                       first_message.get_data()) &&
                    "Nested Array messages are not allowed!");
-            return std::get<Message::StringVariantT>(first_message.data);
+            return std::get<Message::StringVariantT>(first_message.get_data());
           },
           [](const Message::StringVariantT &message_data)
               -> const std::string & { return message_data; },
@@ -33,11 +32,11 @@ const std::string &get_first_elem(const Message &message) {
                       << message_data << std::endl;
             std::terminate();
           }},
-      message.data);
+      message.get_data());
 }
 
 bool is_array(const Message &message) {
-  return std::holds_alternative<Message::NestedVariantT>(message.data);
+  return std::holds_alternative<Message::NestedVariantT>(message.get_data());
 }
 
 } // anonymous namespace
@@ -48,38 +47,43 @@ std::optional<Command> parse_and_validate_command(const Message &message) {
   // Two args in the message means the command has one argument.
   const bool is_array_and_has_two_elements =
       is_array(message) &&
-      std::get<Message::NestedVariantT>(message.data).size() == 2;
+      std::get<Message::NestedVariantT>(message.get_data()).size() == 2;
   if (first_elem == "ping") {
     // PING can be either a simple string on its own or an Array if an argument
     // is provided.
     if (is_array_and_has_two_elements) {
-      const auto &arg = std::get<Message::NestedVariantT>(message.data)[1];
-      assert(arg.data_type != DataType::Array &&
+      const auto &arg =
+          std::get<Message::NestedVariantT>(message.get_data())[1];
+      assert(arg.get_data_type() != DataType::Array &&
              "Nested Array messages are not allowed!");
       return Command{CommandVerb::Ping,
-                     {std::get<Message::StringVariantT>(arg.data)}};
+                     {std::get<Message::StringVariantT>(arg.get_data())}};
     }
     return Command{CommandVerb::Ping, {}};
-  } else if (first_elem == "echo" && is_array_and_has_two_elements) {
+  }
+  if (first_elem == "echo" && is_array_and_has_two_elements) {
     // ECHO requires exactly one argument and therefore must be an Array
     // message.
-    const auto &arg = std::get<Message::NestedVariantT>(message.data)[1];
-    assert(arg.data_type != DataType::Array &&
+    const auto &arg = std::get<Message::NestedVariantT>(message.get_data())[1];
+    assert(arg.get_data_type() != DataType::Array &&
            "Nested Array messages are not allowed!");
     return Command{CommandVerb::Echo,
-                   {std::get<Message::StringVariantT>(arg.data)}};
-  } else if (first_elem == "get" && is_array_and_has_two_elements) {
+                   {std::get<Message::StringVariantT>(arg.get_data())}};
+  }
+  if (first_elem == "get" && is_array_and_has_two_elements) {
     // GET requires exactly one argument and therefore must be an Array message.
-    const auto &arg = std::get<Message::NestedVariantT>(message.data)[1];
-    assert(arg.data_type != DataType::Array &&
+    const auto &arg = std::get<Message::NestedVariantT>(message.get_data())[1];
+    assert(arg.get_data_type() != DataType::Array &&
            "Nested Array messages are not allowed!");
     return Command{CommandVerb::Get,
-                   {std::get<Message::StringVariantT>(arg.data)}};
-  } else if (first_elem == "set" && is_array(message)) {
+                   {std::get<Message::StringVariantT>(arg.get_data())}};
+  }
+  if (first_elem == "set" && is_array(message)) {
     // SET must have at least two arguments (the key and value to set).
-    const auto &messages = std::get<Message::NestedVariantT>(message.data);
-    for ([[maybe_unused]] const auto &m : messages) {
-      assert(m.data_type != DataType::Array &&
+    const auto &messages =
+        std::get<Message::NestedVariantT>(message.get_data());
+    for ([[maybe_unused]] const auto &msg : messages) {
+      assert(msg.get_data_type() != DataType::Array &&
              "Nested Array messages are not allowed!");
     }
     // The first element is the command, so three elements means we have two
@@ -90,35 +94,39 @@ std::optional<Command> parse_and_validate_command(const Message &message) {
       // Copy the messages (skipping the first) as strings and make them the
       // command arguments.
       std::transform(messages.cbegin() + 1, messages.cend(),
-                     std::back_inserter(args), [](const auto &m) {
-                       return std::get<Message::StringVariantT>(m.data);
+                     std::back_inserter(args), [](const auto &msg) {
+                       return std::get<Message::StringVariantT>(msg.get_data());
                      });
       return Command{CommandVerb::Set, std::move(args)};
     }
-  } else if (first_elem == "config" && is_array(message)) {
+  }
+  if (first_elem == "config" && is_array(message)) {
     // TODO this doesn't handle CONFIG GET with a single arg, it should.
     // CONFIG GET must provide at least one argument.
-    const auto &messages = std::get<Message::NestedVariantT>(message.data);
-    for ([[maybe_unused]] const auto &m : messages) {
-      assert(m.data_type != DataType::Array &&
+    const auto &messages =
+        std::get<Message::NestedVariantT>(message.get_data());
+    for ([[maybe_unused]] const auto &msg : messages) {
+      assert(msg.get_data_type() != DataType::Array &&
              "Nested Array messages are not allowed!");
     }
     // The first two elements make up the command, so three elements means we
     // have one argument to the command.
     const bool has_at_least_three_elements =
-        std::get<Message::NestedVariantT>(message.data).size() >= 3;
+        std::get<Message::NestedVariantT>(message.get_data()).size() >= 3;
     if (has_at_least_three_elements &&
-        tolower(std::get<Message::StringVariantT>(messages[1].data)) == "get") {
+        tolower(std::get<Message::StringVariantT>(messages[1].get_data())) ==
+            "get") {
       std::vector<std::string> args{};
       // Copy the messages (skipping the first two) as strings and make them
       // the command arguments.
       std::transform(messages.cbegin() + 2, messages.cend(),
-                     std::back_inserter(args), [](const auto &m) {
-                       return std::get<Message::StringVariantT>(m.data);
+                     std::back_inserter(args), [](const auto &msg) {
+                       return std::get<Message::StringVariantT>(msg.get_data());
                      });
       return Command{CommandVerb::ConfigGet, std::move(args)};
     }
-  } else if (first_elem == "keys") {
+  }
+  if (first_elem == "keys") {
     // TODO actually parse the KEYS arguments (assume "*" for now).
     return Command{CommandVerb::Keys, {}};
   }
@@ -126,27 +134,27 @@ std::optional<Command> parse_and_validate_command(const Message &message) {
   return std::nullopt;
 }
 std::string message_to_string(const Message &message) {
-  std::stringstream ss{};
+  std::stringstream sstr{};
   std::visit(
       MessageDataVisitor{
-          [&ss](const Message::NestedVariantT &message_data) {
-            ss << "*" << message_data.size() << TERMINATOR;
+          [&sstr](const Message::NestedVariantT &message_data) {
+            sstr << "*" << message_data.size() << TERMINATOR;
             for (const auto &elem : message_data) {
-              ss << message_to_string(elem);
+              sstr << message_to_string(elem);
             }
           },
-          [&ss, data_type = message.data_type](
+          [&sstr, data_type = message.get_data_type()](
               const Message::StringVariantT &message_data) {
             switch (data_type) {
             case DataType::SimpleString:
-              ss << "+" << message_data << TERMINATOR;
+              sstr << "+" << message_data << TERMINATOR;
               break;
             case DataType::BulkString:
-              ss << "$" << message_data.size() << TERMINATOR << message_data
-                 << TERMINATOR;
+              sstr << "$" << message_data.size() << TERMINATOR << message_data
+                   << TERMINATOR;
               break;
             case DataType::NullBulkString:
-              ss << "$-1" << TERMINATOR;
+              sstr << "$-1" << TERMINATOR;
               break;
             default:
               std::cerr << "Trying to stringify a Message with Unknown DataType"
@@ -155,8 +163,8 @@ std::string message_to_string(const Message &message) {
             }
           },
       },
-      message.data);
-  return ss.str();
+      message.get_data());
+  return sstr.str();
 }
 
 Message generate_response_message(const Command &command, const Config &config,
@@ -165,22 +173,25 @@ Message generate_response_message(const Command &command, const Config &config,
     // If PING had an argument, reply with just that argument like ECHO would.
     if (command.arguments.size() == 1) {
       const auto data_type = DataType::BulkString;
-      return Message(command.arguments.front(), data_type);
+      return Message{command.arguments.front(), data_type};
     }
     // Otherwise, reply with the simple string "PONG".
-    return Message("PONG", DataType::SimpleString);
-  } else if (command.verb == CommandVerb::Echo) {
-    return Message(command.arguments.front(), DataType::BulkString);
-  } else if (command.verb == CommandVerb::Get) {
+    return Message{"PONG", DataType::SimpleString};
+  }
+  if (command.verb == CommandVerb::Echo) {
+    return Message{command.arguments.front(), DataType::BulkString};
+  }
+  if (command.verb == CommandVerb::Get) {
     // TODO we don't currently handle "*" globs or multiple keys.
     // TODO we assume GET always comes with one and only one argument.
     const auto &key = command.arguments.front();
     const auto value = cache.get(key);
     if (value) {
-      return Message(*value, DataType::BulkString);
+      return Message{*value, DataType::BulkString};
     }
-    return Message("", DataType::NullBulkString);
-  } else if (command.verb == CommandVerb::ConfigGet) {
+    return Message{"", DataType::NullBulkString};
+  }
+  if (command.verb == CommandVerb::ConfigGet) {
     // TODO we don't currently handle "*" globs or multiple keys.
     const auto &key = command.arguments.front();
     std::optional<std::string> value{};
@@ -198,11 +209,13 @@ Message generate_response_message(const Command &command, const Config &config,
           DataType::Array);
     }
     // Otherwise, respond with empty array.
-    return Message(Message::NestedVariantT{}, DataType::Array);
-  } else if (command.verb == CommandVerb::Set) {
+    return Message{Message::NestedVariantT{}, DataType::Array};
+  }
+  if (command.verb == CommandVerb::Set) {
     // Send back OK.
     return Message{"OK", DataType::SimpleString};
-  } else if (command.verb == CommandVerb::Keys) {
+  }
+  if (command.verb == CommandVerb::Keys) {
     // TODO actually parse the KEYS arguments (assume "*" for now).
     // Get all the keys from the cache, and make BulkString messages out of each
     // one.
@@ -211,7 +224,7 @@ Message generate_response_message(const Command &command, const Config &config,
     key_messages.reserve(keys.size());
     std::transform(
         keys.cbegin(), keys.cend(), std::back_inserter(key_messages),
-        [](const auto &k) { return Message{k, DataType::BulkString}; });
+        [](const auto &key) { return Message{key, DataType::BulkString}; });
     // Send them back as an array of these BulkString messages.
     return Message{key_messages, DataType::Array};
   }

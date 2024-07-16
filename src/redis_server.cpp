@@ -56,19 +56,19 @@ void handle_client_connection(const int client_fd, const Config &config,
 }
 
 // Just waits on the future and swallows exceptions (prints them out to cerr).
-void wait_for_async_task(std::future<void> &f) {
+void wait_for_async_task(std::future<void> &fut) {
   try {
-    f.get();
+    fut.get();
   } catch (const std::exception &future_error) {
     std::cerr << "Exception from async task: " << future_error.what()
               << std::endl;
   }
 }
 
-bool is_async_task_done(std::future<void> &f) {
+bool is_async_task_done(std::future<void> &fut) {
   using namespace std::chrono_literals;
-  if (f.wait_for(0s) == std::future_status::ready) {
-    wait_for_async_task(f);
+  if (fut.wait_for(0s) == std::future_status::ready) {
+    wait_for_async_task(fut);
     return true;
   }
 
@@ -78,7 +78,7 @@ bool is_async_task_done(std::future<void> &f) {
 } // anonymous namespace
 
 Server::Server(Config config)
-    : socket_fd_(create_server_socket()), futures_(),
+    : socket_fd_(create_server_socket()),
       // TODO assume there's only one database we read from the RDB file. We
       // don't handle multiple databases.
       cache_(load_cache(config)), config_(std::move(config)) {}
@@ -88,7 +88,7 @@ bool Server::is_ready() const { return socket_fd_.has_value(); }
 void Server::cleanup_finished_client_tasks() {
   const auto new_end =
       std::remove_if(futures_.begin(), futures_.end(),
-                     [](auto &f) { return is_async_task_done(f); });
+                     [](auto &fut) { return is_async_task_done(fut); });
   if (new_end != futures_.end()) {
     std::cout << "Cleanup resulted in erasing " << futures_.end() - new_end
               << " task(s)!" << std::endl;

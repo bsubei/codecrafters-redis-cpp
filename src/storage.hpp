@@ -4,7 +4,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <istream>
 #include <optional>
 #include <unordered_map>
@@ -38,13 +37,13 @@ struct Header {
   std::uint8_t version = 0;
 };
 struct Metadata {
-  std::optional<std::uint64_t> creation_time{};
-  std::optional<std::uint64_t> used_memory{}; // TODO units?
-  std::optional<std::string> redis_version{};
-  std::optional<NumBits> redis_num_bits{};
+  std::optional<std::uint64_t> creation_time;
+  std::optional<std::uint64_t> used_memory; // TODO units?
+  std::optional<std::string> redis_version;
+  std::optional<NumBits> redis_num_bits;
 };
 struct DatabaseSection {
-  std::unordered_map<Cache::KeyT, Cache::EntryT> data{};
+  std::unordered_map<Cache::KeyT, Cache::EntryT> data;
 };
 struct EndOfFile {
   std::array<std::uint8_t, 8> crc64{};
@@ -54,13 +53,13 @@ struct EndOfFile {
 struct RDB {
   Header header{};
   Metadata metadata{};
-  std::vector<DatabaseSection> database_sections{};
+  std::vector<DatabaseSection> database_sections;
   EndOfFile eof{};
 };
 
-std::uint32_t parse_length_encoded_integer(std::istream &is);
-std::string parse_length_encoded_string(std::istream &is);
-RDB read_rdb(std::istream &is);
+std::uint32_t parse_length_encoded_integer(std::istream &inputs);
+std::string parse_length_encoded_string(std::istream &inputs);
+RDB read_rdb(std::istream &inputs);
 Cache load_cache(const Config &config);
 
 // TODO We currently only support two kinds of string encodings:
@@ -75,7 +74,7 @@ enum class IntAsString : std::uint8_t {
   FOUR_BYTES,
 };
 using StringEncoding = std::variant<LengthPrefixedString, IntAsString>;
-StringEncoding parse_string_encoding(std::istream &is);
+StringEncoding parse_string_encoding(std::istream &inputs);
 
 // helper type to create visitors for the StringEncoding variant.
 template <class... Ts> struct StringEncodingVisitor : Ts... {

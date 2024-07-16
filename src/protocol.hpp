@@ -8,9 +8,6 @@
 #include <variant>
 #include <vector>
 
-// Our library's header includes.
-#include "utils.hpp"
-
 // This file contains all the types required to work with the Redis
 // serialization protocol specification (RESP). Only RESP 2.0 is supported, 3.0
 // is explicitly not supported.
@@ -64,7 +61,7 @@ enum class CommandVerb : std::uint8_t {
 // how to respond to the client.
 struct Command {
   CommandVerb verb{};
-  std::vector<std::string> arguments{};
+  std::vector<std::string> arguments;
 };
 
 // helper type to create visitors for the Message data variant.
@@ -84,9 +81,12 @@ template <class... Ts> struct MessageDataVisitor : Ts... {
 struct Message {
   using StringVariantT = std::string;
   using NestedVariantT = std::vector<Message>;
-  std::variant<StringVariantT, NestedVariantT> data{};
-  DataType data_type{};
 
+private:
+  std::variant<StringVariantT, NestedVariantT> data;
+  DataType data_type{DataType::Unknown};
+
+public:
   // Empty ctor
   Message() = default;
 
@@ -110,9 +110,15 @@ struct Message {
     }
   }
 
+  [[nodiscard]] const std::variant<StringVariantT, NestedVariantT> &
+  get_data() const {
+    return data;
+  }
+  [[nodiscard]] DataType get_data_type() const { return data_type; }
+
   bool operator==(const Message &other) const = default;
 
   // TODO this is causing issues in MSAN
   // For displaying in GTEST.
-  friend std::ostream &operator<<(std::ostream &os, const Message &message);
+  friend std::ostream &operator<<(std::ostream &outs, const Message &message);
 };

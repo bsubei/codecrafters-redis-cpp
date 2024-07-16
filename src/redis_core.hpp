@@ -6,7 +6,6 @@
 #include <optional>
 #include <string>
 #include <utility>
-#include <vector>
 
 // Our library's header includes.
 #include "protocol.hpp"
@@ -26,25 +25,25 @@ std::string message_to_string(const Message &message);
 // temporary strings just to create a Message. Given a string or string_view,
 // parse it into a Message and return that.
 template <StringLike StringType>
-Message message_from_string(const StringType &s) {
+Message message_from_string(const StringType &str) {
   // TODO if given string is missing terminators, we get undefined behavior.
   // Consider how to do proper error handling without slowing things down (or
   // maybe profile it first).
 
-  const auto data_type = get_type(s);
+  const auto data_type = get_type(str);
 
   switch (data_type) {
   // Non-array types of Messages should be parsed as a single string.
   case DataType::BulkString:
   case DataType::SimpleString:
-    return Message(parse_string(s, data_type), data_type);
+    return Message(parse_string(str, data_type), data_type);
   // Array type of Message is nested (assumes only one level of nesting) and
   // contains a vector of Messages, which must themselves be parsed. Note that
   // we recurse over each of these nested Messages.
   case DataType::Array: {
     // Split the message into that many tokens (e.g. "$4\r\nECHO\r\n" and
     // "$2\r\nhi\r\n").
-    const auto tokens = tokenize_array(s);
+    const auto tokens = tokenize_array(str);
     // Recurse over each of these tokens, expecting them to come back as parsed
     // messages of non-Array data_type.
     Message::NestedVariantT message_data{};
@@ -59,7 +58,7 @@ Message message_from_string(const StringType &s) {
   // send us nils.
   default:
     std::cerr << "message_from_string unimplemented for data_type "
-              << static_cast<int>(data_type) << ", was given string: " << s
+              << static_cast<int>(data_type) << ", was given string: " << str
               << std::endl;
     std::terminate();
   }
@@ -67,8 +66,8 @@ Message message_from_string(const StringType &s) {
 }
 // TODO hacky way to get string literals (e.g. in tests) to work by simply
 // copying them into a string. Needs improved.
-inline Message message_from_string(const char *s) {
-  return message_from_string(std::string(s));
+inline Message message_from_string(const char *str) {
+  return message_from_string(std::string(str));
 }
 
 Message generate_response_message(const Command &command, const Config &config,

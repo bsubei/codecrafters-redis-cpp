@@ -7,8 +7,8 @@
 #include <cstring>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <utility>
 
 // Our library's header includes.
 #include "config.hpp"
@@ -25,12 +25,13 @@ std::optional<std::ifstream> read_file(const std::filesystem::path &filepath) {
   return file_contents;
 }
 
-std::string read_string_n_bytes(std::istream &is, const std::size_t num_bytes) {
+std::string read_string_n_bytes(std::istream &inputs,
+                                const std::streamsize num_bytes) {
   // Read the rest of the string and return it.
   std::string buf{};
   buf.resize(num_bytes);
-  is.read(&buf[0], num_bytes);
-  if (!is.good()) {
+  inputs.read(buf.data(), num_bytes);
+  if (!inputs.good()) {
     std::cerr << "Unable to read string with " << num_bytes << " bytes"
               << std::endl;
     std::terminate();
@@ -53,7 +54,8 @@ decltype(auto) bytes_to_int(const std::array<std::byte, num_bytes> &bytes) {
     } else if constexpr (num_bytes == 8) {
       return static_cast<std::uint64_t>(0);
     } else {
-      static_assert(false && "Unsupported num_bytes was given");
+      //  Unsupported num_bytes was given
+      static_assert(false);
     }
   };
 
@@ -68,10 +70,10 @@ decltype(auto) bytes_to_int(const std::array<std::byte, num_bytes> &bytes) {
 }
 
 template <std::size_t num_bytes>
-decltype(auto) read_int_n_bytes(std::istream &is) {
+decltype(auto) read_int_n_bytes(std::istream &inputs) {
   std::array<std::byte, num_bytes> buf{};
-  is.read(reinterpret_cast<char *>(buf.data()), num_bytes);
-  if (!is.good()) {
+  inputs.read(reinterpret_cast<char *>(buf.data()), num_bytes);
+  if (!inputs.good()) {
     std::cerr << "Unable to read int with " << num_bytes << " bytes"
               << std::endl;
     std::terminate();
@@ -79,13 +81,13 @@ decltype(auto) read_int_n_bytes(std::istream &is) {
   return bytes_to_int<num_bytes>(buf);
 }
 
-// If the next byte is the given opcode, consume it and return true. Otherwise,
-// just return false.
-bool is_opcode_section(const std::byte opcode, std::istream &is) {
-  if (std::byte(is.peek()) == opcode) {
+// If the next byte inputs the given opcode, consume it and return true.
+// Otherwise, just return false.
+bool is_opcode_section(const std::byte opcode, std::istream &inputs) {
+  if (std::byte(inputs.peek()) == opcode) {
     // Consume the opcode byte.
-    is.get();
-    if (!is.good()) {
+    inputs.get();
+    if (!inputs.good()) {
       std::cerr << "Unable to read opcode section: " << std::setbase(16)
                 << std::to_integer<std::uint8_t>(opcode) << std::endl;
       std::terminate();
@@ -95,11 +97,11 @@ bool is_opcode_section(const std::byte opcode, std::istream &is) {
   return false;
 }
 
-Header read_rdb_header(std::istream &is) {
+Header read_rdb_header(std::istream &inputs) {
   std::string buf{};
   buf.resize(5);
-  is.read(buf.data(), 5);
-  if (!is.good() || buf != RDB_MAGIC) {
+  inputs.read(buf.data(), 5);
+  if (!inputs.good() || buf != RDB_MAGIC) {
     std::cerr << "Unable to read magic '" << RDB_MAGIC << "' in header"
               << std::endl;
     std::terminate();
@@ -107,29 +109,29 @@ Header read_rdb_header(std::istream &is) {
 
   buf.clear();
   buf.resize(4);
-  is.read(buf.data(), 4);
-  if (!is.good()) {
+  inputs.read(buf.data(), 4);
+  if (!inputs.good()) {
     std::cerr << "Unable to read RDB version in header" << std::endl;
     std::terminate();
   }
 
   std::uint8_t version = std::stoul(buf);
   if (version < MIN_SUPPORTED_RDB_VERSION) {
-    std::cerr << "RDB version is too old: " << std::to_string(version)
+    std::cerr << "RDB version inputs too old: " << std::to_string(version)
               << std::endl;
   }
 
   return Header{.version = version};
 }
 
-Metadata read_rdb_metadata(std::istream &is) {
+Metadata read_rdb_metadata(std::istream &inputs) {
   Metadata metadata{};
   // Keep reading key-value pairs until we no longer see the Metadata opcode.
-  while (is_opcode_section(RDB_AUX, is)) {
+  while (is_opcode_section(RDB_AUX, inputs)) {
     // Read a string-encoded key.
-    const std::string key = parse_length_encoded_string(is);
+    const std::string key = parse_length_encoded_string(inputs);
     // Read a string-encoded value.
-    const std::string value = parse_length_encoded_string(is);
+    const std::string value = parse_length_encoded_string(inputs);
     // Manually set the metadata fields.
     if (key == "ctime") {
       metadata.creation_time = std::stoul(value);
@@ -156,14 +158,15 @@ Metadata read_rdb_metadata(std::istream &is) {
 
   return metadata;
 }
-std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
+std::vector<DatabaseSection> read_rdb_database_sections(std::istream &inputs) {
   std::vector<DatabaseSection> db_sections{};
   // Read each database section
-  while (is_opcode_section(RDB_DB_SELECTOR, is)) {
+  while (is_opcode_section(RDB_DB_SELECTOR, inputs)) {
     DatabaseSection db_section{};
-    // Double check that the db number it's saying we're in is the correct one.
-    const std::uint8_t db_number = is.get();
-    if (!is.good()) {
+    // Double check that the db number it's saying we're in inputs the correct
+    // one.
+    const std::uint8_t db_number = inputs.get();
+    if (!inputs.good()) {
       std::cerr << "Unable to read DB number" << std::endl;
       std::terminate();
     }
@@ -173,38 +176,39 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
       std::terminate();
     }
     // Expect the hash table size section and read the sizes.
-    if (!is_opcode_section(RDB_RESIZE, is)) {
+    if (!is_opcode_section(RDB_RESIZE, inputs)) {
       std::cerr << "Expected RDB_RESIZE opcode" << std::endl;
       std::terminate();
     }
-    const std::uint32_t num_key_value_pairs = parse_length_encoded_integer(is);
-    const std::uint32_t num_expiry_pairs = parse_length_encoded_integer(is);
+    const std::uint32_t num_key_value_pairs =
+        parse_length_encoded_integer(inputs);
+    const std::uint32_t num_expiry_pairs = parse_length_encoded_integer(inputs);
     std::uint32_t num_expiry_so_far = 0;
     // Now read that many key-value pairs.
     for (std::uint32_t i = 0; i < num_key_value_pairs; ++i) {
       Cache::ExpiryValueT expiry{std::nullopt};
       // Check for a possible expiry prefix.
-      if (is_opcode_section(RDB_EXPIRE_TIME_S, is)) {
+      if (is_opcode_section(RDB_EXPIRE_TIME_S, inputs)) {
         // Convert the expiry timestamp to our steady_clock representation so
         // we're immune to random jumps in time.
         expiry = unix_timestamp_to_steady_clock<std::chrono::seconds>(
-            read_int_n_bytes<4>(is));
+            read_int_n_bytes<4>(inputs));
         ++num_expiry_so_far;
-      } else if (is_opcode_section(RDB_EXPIRE_TIME_MS, is)) {
+      } else if (is_opcode_section(RDB_EXPIRE_TIME_MS, inputs)) {
         // Convert the expiry timestamp to our steady_clock representation so
         // we're immune to random jumps in time.
         expiry = unix_timestamp_to_steady_clock<std::chrono::milliseconds>(
-            read_int_n_bytes<8>(is));
+            read_int_n_bytes<8>(inputs));
         ++num_expiry_so_far;
       }
       // Read the value type.
-      auto value_type = read_int_n_bytes<1>(is);
+      auto value_type = read_int_n_bytes<1>(inputs);
       // Read the string-encoded key.
-      std::string key = parse_length_encoded_string(is);
+      std::string key = parse_length_encoded_string(inputs);
       // TODO we currently only support the "string encoding" value type.
       if (value_type == 0) {
         // Read value encoded as string.
-        std::string value = parse_length_encoded_string(is);
+        std::string value = parse_length_encoded_string(inputs);
         // Finally, we can populate this key-value pair possibly with an expiry.
         db_section.data.emplace(key, Cache::EntryT{value, expiry});
 
@@ -224,13 +228,13 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &is) {
   }
   return db_sections;
 }
-EndOfFile read_rdb_eof_section(std::istream &is) {
-  if (is_opcode_section(RDB_EOF, is)) {
+EndOfFile read_rdb_eof_section(std::istream &inputs) {
+  if (is_opcode_section(RDB_EOF, inputs)) {
     // TODO compute the actual CRC of the entire stream from start to this point
     // so we can compare it. Read the recorded CRC.
     std::array<std::uint8_t, 8> buf{};
-    is.read(reinterpret_cast<char *>(buf.data()), 8);
-    if (!is.good()) {
+    inputs.read(reinterpret_cast<char *>(buf.data()), 8);
+    if (!inputs.good()) {
       std::cerr << "Unable to read CRC 8 bytes" << std::endl;
       std::terminate();
     }
@@ -244,10 +248,10 @@ EndOfFile read_rdb_eof_section(std::istream &is) {
 
 // Parse only the bytes needed to determine the encoding and return the
 // encoding.
-StringEncoding parse_string_encoding(std::istream &is) {
+StringEncoding parse_string_encoding(std::istream &inputs) {
   // Read the first byte, and use that to discover what encoding we need to use.
-  std::uint8_t l = is.get();
-  if (!is.good()) {
+  std::uint8_t l = inputs.get();
+  if (!inputs.good()) {
     std::cerr << "Unable to read length byte" << std::endl;
     std::terminate();
   }
@@ -266,8 +270,8 @@ StringEncoding parse_string_encoding(std::istream &is) {
   // Read one additional byte. The combined 14 bits represent the length. This
   // covers lengths from 64 to 16383.
   case 0b01: {
-    const std::uint16_t least_significant_byte = is.get();
-    if (!is.good()) {
+    const std::uint16_t least_significant_byte = inputs.get();
+    if (!inputs.good()) {
       std::cerr << "Unable to read second length byte" << std::endl;
       std::terminate();
     }
@@ -283,7 +287,7 @@ StringEncoding parse_string_encoding(std::istream &is) {
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
   // covers lengths from 16384 to (2^32)-1.
   case 0b10: {
-    const auto length = read_int_n_bytes<4>(is);
+    const auto length = read_int_n_bytes<4>(inputs);
     return LengthPrefixedString{length};
   }
   // Special format. We only support "Integers as Strings". Expect 0, 1, or 2
@@ -316,11 +320,11 @@ StringEncoding parse_string_encoding(std::istream &is) {
   }
   return {};
 }
-std::uint32_t parse_length_encoded_integer(std::istream &is) {
-  // Parsing a length-encoded integer is just like that of a string, except the
-  // length of the string ends up being the integer we want, so we can just
+std::uint32_t parse_length_encoded_integer(std::istream &inputs) {
+  // Parsing a length-encoded integer inputs just like that of a string, except
+  // the length of the string ends up being the integer we want, so we can just
   // return that.
-  const auto encoding = parse_string_encoding(is);
+  const auto encoding = parse_string_encoding(inputs);
   if (!std::holds_alternative<LengthPrefixedString>(encoding)) {
     std::cerr
         << "Cannot parse integer using encoding other than length prefixed"
@@ -329,23 +333,23 @@ std::uint32_t parse_length_encoded_integer(std::istream &is) {
   }
   return std::get<LengthPrefixedString>(encoding);
 }
-std::string parse_length_encoded_string(std::istream &is) {
+std::string parse_length_encoded_string(std::istream &inputs) {
   // Determine the kind of encoding (includes how many bytes to read).
-  const auto string_encoding = parse_string_encoding(is);
+  const auto string_encoding = parse_string_encoding(inputs);
   // Now read that many bytes depending on the encoding.
   return std::visit(StringEncodingVisitor{
-                        [&is](const LengthPrefixedString &l) {
-                          return read_string_n_bytes(is, l);
+                        [&inputs](const LengthPrefixedString &l) {
+                          return read_string_n_bytes(inputs, l);
                         },
-                        [&is](const IntAsString &o) {
+                        [&inputs](const IntAsString &o) {
                           // Read the next N bytes as an integer, and convert to
                           // a string.
                           if (o == IntAsString::ONE_BYTE) {
-                            return std::to_string(read_int_n_bytes<1>(is));
+                            return std::to_string(read_int_n_bytes<1>(inputs));
                           } else if (o == IntAsString::TWO_BYTES) {
-                            return std::to_string(read_int_n_bytes<2>(is));
+                            return std::to_string(read_int_n_bytes<2>(inputs));
                           } else if (o == IntAsString::FOUR_BYTES) {
-                            return std::to_string(read_int_n_bytes<4>(is));
+                            return std::to_string(read_int_n_bytes<4>(inputs));
                           } else {
                             std::cerr
                                 << "Unknown IntAsString enum: "
@@ -362,12 +366,12 @@ std::string parse_length_encoded_string(std::istream &is) {
                     },
                     string_encoding);
 }
-RDB read_rdb(std::istream &is) {
+RDB read_rdb(std::istream &inputs) {
   // Read these sections in this particular sequence.
-  auto header = read_rdb_header(is);
-  auto metadata = read_rdb_metadata(is);
-  auto db_sections = read_rdb_database_sections(is);
-  auto eof_section = read_rdb_eof_section(is);
+  auto header = read_rdb_header(inputs);
+  auto metadata = read_rdb_metadata(inputs);
+  auto db_sections = read_rdb_database_sections(inputs);
+  auto eof_section = read_rdb_eof_section(inputs);
   return RDB{.header = header,
              .metadata = metadata,
              .database_sections = db_sections,

@@ -25,10 +25,11 @@ std::optional<int> create_server_socket() {
   }
 
   // Bind the socket to the desired address/port.
-  struct sockaddr_in server_addr;
+  struct sockaddr_in server_addr {};
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(6379);
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
   if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) !=
       0) {
     std::cerr << "Failed to bind to port 6379\n";
@@ -46,13 +47,15 @@ std::optional<int> create_server_socket() {
 }
 
 int await_client_connection(const int server_fd) {
-  struct sockaddr_in client_addr;
+  struct sockaddr_in client_addr {};
   int client_addr_len = sizeof(client_addr);
 
   std::cout << "Waiting for a client to connect...\n";
 
-  int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-                         (socklen_t *)&client_addr_len);
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
+  int client_fd = accept4(server_fd, (struct sockaddr *)&client_addr,
+                          (socklen_t *)&client_addr_len, SOCK_CLOEXEC);
+  // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
   std::cout << "Client " << client_fd << " connected!\n";
   return client_fd;
 }

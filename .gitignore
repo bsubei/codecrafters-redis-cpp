@@ -52,3 +52,5 @@ vcpkg_installed
 
 # codechecker cache
 .codechecker/
+
+.vscode/settings.json

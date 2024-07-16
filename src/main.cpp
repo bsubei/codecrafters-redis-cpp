@@ -1,6 +1,3 @@
-// System includes.
-#include <iostream>
-
 // Other includes.
 #include <CLI11.hpp>
 
@@ -12,11 +9,11 @@
 int main(int argc, char **argv) {
   Config config{};
   CLI::App app{"RedisClone"};
-  auto dir_option =
+  auto *dir_option =
       app.add_option("--dir", config.dir,
                      "Directory where the RDB file is stored. Both --dir and "
                      "--dbfilename must be specified together.");
-  auto dbfilename_option =
+  auto *dbfilename_option =
       app.add_option("--dbfilename", config.dbfilename,
                      "Filename where the RDB file is stored. Both --dir and "
                      "--dbfilename must be specified together.");

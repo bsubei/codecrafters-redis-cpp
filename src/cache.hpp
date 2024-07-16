@@ -2,7 +2,6 @@
 
 // System includes.
 #include <chrono>
-#include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <string>
@@ -18,12 +17,13 @@ public:
 
 private:
   // This mutex will protect the data map.
-  mutable std::shared_mutex mutex{};
-  std::unordered_map<KeyT, EntryT> data{};
+  mutable std::shared_mutex mutex;
+  std::unordered_map<KeyT, EntryT> data;
 
 public:
   Cache() = default;
-  Cache(std::unordered_map<KeyT, EntryT> data_in) : data(std::move(data_in)) {}
+  explicit Cache(std::unordered_map<KeyT, EntryT> data_in)
+      : data(std::move(data_in)) {}
 
   // TODO consider changing this to return a ref string for efficiency.
   std::optional<std::string> get(const std::string &key) const;
