@@ -7,18 +7,18 @@
 #include <string>
 
 template <typename T>
-concept StringLike = requires(T a) {
-  { a.begin() } -> std::input_iterator;
-  { a.end() } -> std::input_iterator;
-  { a.cbegin() } -> std::input_iterator;
-  { a.cend() } -> std::input_iterator;
-  { a.size() } -> std::convertible_to<std::size_t>;
-  { std::tolower(*a.cbegin()) } -> std::same_as<int>;
+concept StringLike = requires(T str) {
+  { str.begin() } -> std::input_iterator;
+  { str.end() } -> std::input_iterator;
+  { str.cbegin() } -> std::input_iterator;
+  { str.cend() } -> std::input_iterator;
+  { str.size() } -> std::convertible_to<std::size_t>;
+  { std::tolower(*str.cbegin()) } -> std::same_as<int>;
 };
 
-template <StringLike StringType> std::string tolower(const StringType &s) {
-  std::string lower{s.cbegin(), s.cend()};
+template <StringLike StringType> std::string tolower(const StringType &str) {
+  std::string lower{str.cbegin(), str.cend()};
   std::transform(lower.cbegin(), lower.cend(), lower.begin(),
-                 [](auto c) { return std::tolower(c); });
+                 [](auto character) { return std::tolower(character); });
   return lower;
 }

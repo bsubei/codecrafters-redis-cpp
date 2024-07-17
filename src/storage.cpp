@@ -72,6 +72,7 @@ decltype(auto) bytes_to_int(const std::array<std::byte, num_bytes> &bytes) {
 template <std::size_t num_bytes>
 decltype(auto) read_int_n_bytes(std::istream &inputs) {
   std::array<std::byte, num_bytes> buf{};
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   inputs.read(reinterpret_cast<char *>(buf.data()), num_bytes);
   if (!inputs.good()) {
     std::cerr << "Unable to read int with " << num_bytes << " bytes"
@@ -115,7 +116,7 @@ Header read_rdb_header(std::istream &inputs) {
     std::terminate();
   }
 
-  std::uint8_t version = std::stoul(buf);
+  auto version = static_cast<std::uint8_t>(std::stoul(buf));
   if (version < MIN_SUPPORTED_RDB_VERSION) {
     std::cerr << "RDB version inputs too old: " << std::to_string(version)
               << std::endl;
@@ -165,7 +166,7 @@ std::vector<DatabaseSection> read_rdb_database_sections(std::istream &inputs) {
     DatabaseSection db_section{};
     // Double check that the db number it's saying we're in inputs the correct
     // one.
-    const std::uint8_t db_number = inputs.get();
+    const auto db_number = static_cast<std::uint8_t>(inputs.get());
     if (!inputs.good()) {
       std::cerr << "Unable to read DB number" << std::endl;
       std::terminate();
@@ -233,6 +234,7 @@ EndOfFile read_rdb_eof_section(std::istream &inputs) {
     // TODO compute the actual CRC of the entire stream from start to this point
     // so we can compare it. Read the recorded CRC.
     std::array<std::uint8_t, 8> buf{};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     inputs.read(reinterpret_cast<char *>(buf.data()), 8);
     if (!inputs.good()) {
       std::cerr << "Unable to read CRC 8 bytes" << std::endl;
@@ -250,12 +252,11 @@ EndOfFile read_rdb_eof_section(std::istream &inputs) {
 // encoding.
 StringEncoding parse_string_encoding(std::istream &inputs) {
   // Read the first byte, and use that to discover what encoding we need to use.
-  std::uint8_t l = inputs.get();
+  const auto length_byte = std::byte(inputs.get());
   if (!inputs.good()) {
     std::cerr << "Unable to read length byte" << std::endl;
     std::terminate();
   }
-  std::byte length_byte = std::byte(l);
 
   const std::byte length_encoding_bits =
       (length_byte & LENGTH_ENCODING_MASK) >> 6;
@@ -263,14 +264,15 @@ StringEncoding parse_string_encoding(std::istream &inputs) {
   // The remaining 6 bits represent the length of the string. This covers
   // lengths from 0 to 63.
   case 0b00: {
-    const std::uint8_t length =
+    const auto length =
         std::to_integer<std::uint8_t>(length_byte & (~LENGTH_ENCODING_MASK));
     return LengthPrefixedString{length};
   }
   // Read one additional byte. The combined 14 bits represent the length. This
   // covers lengths from 64 to 16383.
   case 0b01: {
-    const std::uint16_t least_significant_byte = inputs.get();
+    const auto least_significant_byte =
+        static_cast<std::uint16_t>(inputs.get());
     if (!inputs.good()) {
       std::cerr << "Unable to read second length byte" << std::endl;
       std::terminate();
@@ -280,8 +282,9 @@ StringEncoding parse_string_encoding(std::istream &inputs) {
     // little endian order.
     const auto most_significant_byte =
         std::to_integer<std::uint16_t>(length_byte & ~LENGTH_ENCODING_MASK);
-    std::uint16_t length =
-        (most_significant_byte << 8) | least_significant_byte;
+    const std::uint16_t length =
+        static_cast<std::uint16_t>(most_significant_byte << 8U) |
+        least_significant_byte;
     return LengthPrefixedString{length};
   }
   // Discard the remaining 6 bits. The next 4 bytes represent the length. This
@@ -338,25 +341,26 @@ std::string parse_length_encoded_string(std::istream &inputs) {
   const auto string_encoding = parse_string_encoding(inputs);
   // Now read that many bytes depending on the encoding.
   return std::visit(StringEncodingVisitor{
-                        [&inputs](const LengthPrefixedString &l) {
-                          return read_string_n_bytes(inputs, l);
+                        [&inputs](const LengthPrefixedString &length) {
+                          return read_string_n_bytes(inputs, length);
                         },
-                        [&inputs](const IntAsString &o) {
+                        [&inputs](const IntAsString &int_as_string) {
                           // Read the next N bytes as an integer, and convert to
                           // a string.
-                          if (o == IntAsString::ONE_BYTE) {
+                          if (int_as_string == IntAsString::ONE_BYTE) {
                             return std::to_string(read_int_n_bytes<1>(inputs));
-                          } else if (o == IntAsString::TWO_BYTES) {
-                            return std::to_string(read_int_n_bytes<2>(inputs));
-                          } else if (o == IntAsString::FOUR_BYTES) {
-                            return std::to_string(read_int_n_bytes<4>(inputs));
-                          } else {
-                            std::cerr
-                                << "Unknown IntAsString enum: "
-                                << std::to_string(static_cast<std::uint8_t>(o))
-                                << std::endl;
-                            std::terminate();
                           }
+                          if (int_as_string == IntAsString::TWO_BYTES) {
+                            return std::to_string(read_int_n_bytes<2>(inputs));
+                          }
+                          if (int_as_string == IntAsString::FOUR_BYTES) {
+                            return std::to_string(read_int_n_bytes<4>(inputs));
+                          }
+                          std::cerr << "Unknown IntAsString enum: "
+                                    << std::to_string(static_cast<std::uint8_t>(
+                                           int_as_string))
+                                    << std::endl;
+                          std::terminate();
                         },
                         [](const auto &) {
                           std::cerr << "Unknown StringEncoding variant"

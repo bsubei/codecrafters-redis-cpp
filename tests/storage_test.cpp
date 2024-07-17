@@ -1,9 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <istream>
-#include <ostream>
 #include <random>
+#include <sstream>
 #include <string>
 
 #include "../src/storage.hpp"
@@ -13,6 +12,7 @@ std::string get_random_string_n_bytes(const std::size_t length) {
   // These are declared thread_local so we don't needlessly create them for
   // every function call, and at the same time preserving thread safety.
   // Use a fixed seed so our tests are deterministic.
+  // NOLINTNEXTLINE(cert-msc51-cpp, cert-msc32-c)
   thread_local std::mt19937 generator(42);
   // We generate each byte randomly (all values are possible).
   thread_local std::uniform_int_distribution<> distribution(0, 255);
@@ -35,7 +35,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // NOTE: we have to be a little careful because std::string treats "\0" bytes
   // as a c-str null char.
   std::istringstream input{std::string("\x00", 1)};
-  std::string expected_output = "";
+  std::string expected_output{};
   std::string actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);
@@ -91,7 +91,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // length 16384 (which is the same as the swapped bytes: 0x00004000).
   expected_output = get_random_string_n_bytes(16384);
   input = std::istringstream{"\x80" + std::string("\x00", 1) + "\x40" +
-                             std::string("\x00", 2) + expected_output};
+                             std::string(2, '\x00') + expected_output};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);
@@ -101,7 +101,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // discarded). The next four bytes come in little-endian and make up the
   // length 17000 (which is the same as the swapped bytes: 0x00004268).
   expected_output = get_random_string_n_bytes(17000);
-  input = std::istringstream{"\x80\x68\x42" + std::string("\x00", 2) +
+  input = std::istringstream{"\x80\x68\x42" + std::string(2, '\x00') +
                              expected_output};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
@@ -134,7 +134,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // Test case: length encoding bits are 11 and the string a 16-bit integer with
   // value 256.
   expected_output = "256";
-  input = std::istringstream{"\xC1" + std::string("\x00", 1) + "\x01"};
+  input = std::istringstream{"\xC1" + std::string(1, '\x00') + "\x01"};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
   EXPECT_EQ(actual_output, expected_output);
@@ -150,7 +150,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
   // Test case: length encoding bits are 11 and the string a 32-bit integer with
   // value 2^16 (65536).
   expected_output = "65536";
-  input = std::istringstream{"\xC2" + std::string("\x00", 2) + "\x01" +
+  input = std::istringstream{"\xC2" + std::string(2, '\x00') + "\x01" +
                              std::string("\x00", 1)};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
@@ -158,7 +158,7 @@ TEST(StorageTest, ParseLengthEncodedString) {
 
   // Test case: length encoding bits are 11 and the string a 32-bit integer with
   // value (2^32)-1.
-  expected_output = std::to_string((static_cast<std::uint64_t>(1) << 32) - 1);
+  expected_output = std::to_string((static_cast<std::uint64_t>(1) << 32U) - 1);
   input = std::istringstream{"\xC2\xFF\xFF\xFF\xFF"};
   actual_output = parse_length_encoded_string(input);
   EXPECT_EQ(actual_output.size(), expected_output.size());
@@ -196,10 +196,11 @@ TEST(StorageTest, ReadRDB) {
   // NOTE: we have to create a std::string out of it because we want to be able
   // to explicitly give it the size, otherwise it treats the 0x00 bytes an null
   // char terminators and we end up with a shorter string than we should.
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   const std::string rdb_string(reinterpret_cast<const char *>(rdb_bytes.data()),
                                rdb_bytes.size());
-  std::istringstream is{rdb_string};
-  const auto rdb = read_rdb(is);
+  std::istringstream input_stream{rdb_string};
+  const auto rdb = read_rdb(input_stream);
   EXPECT_EQ(rdb.header.version, 9);
   EXPECT_EQ(rdb.metadata.redis_version, "5.0.7");
   EXPECT_EQ(rdb.metadata.redis_num_bits, NumBits::ARCHITECTURE_64_BITS);

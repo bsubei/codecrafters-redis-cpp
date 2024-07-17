@@ -41,13 +41,14 @@ TEST(MessageTest, MessageFromString) {
 }
 
 TEST(MessageTest, RoundTrip) {
-  const auto m1 = Message("PING", DataType::SimpleString);
-  const auto m2 = Message("hiya there", DataType::BulkString);
-  const auto m3 = Message(Message::NestedVariantT{m1, m2}, DataType::Array);
+  const auto msg1 = Message("PING", DataType::SimpleString);
+  const auto msg2 = Message("hiya there", DataType::BulkString);
+  const auto msg3 =
+      Message(Message::NestedVariantT{msg1, msg2}, DataType::Array);
   const auto empty = Message(Message::NestedVariantT{}, DataType::Array);
 
-  EXPECT_EQ(m1, message_from_string(message_to_string(m1)));
-  EXPECT_EQ(m2, message_from_string(message_to_string(m2)));
-  EXPECT_EQ(m3, message_from_string(message_to_string(m3)));
+  EXPECT_EQ(msg1, message_from_string(message_to_string(msg1)));
+  EXPECT_EQ(msg2, message_from_string(message_to_string(msg2)));
+  EXPECT_EQ(msg3, message_from_string(message_to_string(msg3)));
   EXPECT_EQ(empty, message_from_string(message_to_string(empty)));
 }

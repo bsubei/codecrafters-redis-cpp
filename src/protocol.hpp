@@ -83,6 +83,7 @@ struct Message {
   using NestedVariantT = std::vector<Message>;
 
 private:
+  // TODO consider using a variant for each data type
   std::variant<StringVariantT, NestedVariantT> data;
   DataType data_type{DataType::Unknown};
 
