@@ -8,10 +8,11 @@
 // Our library's header includes.
 #include "cache.hpp"
 #include "config.hpp"
+#include "network.hpp"
 
 class Server {
 private:
-  std::optional<int> socket_fd_;
+  std::optional<SocketFd> socket_fd_;
   // These futures are handles to the asynchronous tasks, each handling a client
   // connection.
   std::deque<std::future<void>> futures_;

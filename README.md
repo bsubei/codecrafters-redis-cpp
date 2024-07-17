@@ -23,8 +23,9 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 # Bugs / Missing Features / TODOs
 
 - [x] set up consistent formatter/linter
-- [ ] the code that reads from the client socket can only handle 1024 bytes. (add tests for this)
-- [ ] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
+- [x] the code that reads from the client socket can only handle 1024 bytes. (add tests for this)
+- [x] can't handle client messages with newlines (I think this is fixed but tests wouldn't be a bad idea?)
+- [ ] need tests for network code (simple integration test will do just fine, since codecrafters doesn't let me test whatever I want)
 - [ ] GET commands don't support multiple args or wildcards.
 - [x] set up `*san` builds and run them regularly.
 - [x] use blacklists to get msan and tsan to shut up about CLI11

@@ -33,10 +33,6 @@ Message message_from_string(const StringType &str) {
   const auto data_type = get_type(str);
 
   switch (data_type) {
-  // Non-array types of Messages should be parsed as a single string.
-  case DataType::BulkString:
-  case DataType::SimpleString:
-    return Message(parse_string(str, data_type), data_type);
   // Array type of Message is nested (assumes only one level of nesting) and
   // contains a vector of Messages, which must themselves be parsed. Note that
   // we recurse over each of these nested Messages.
@@ -54,6 +50,10 @@ Message message_from_string(const StringType &str) {
     // Create a Message that contains the vector of Messages.
     return Message(std::move(message_data), data_type);
   }
+  // Non-array types of Messages should be parsed as a single string.
+  case DataType::BulkString:
+  case DataType::SimpleString:
+    return Message(parse_string(str, data_type), data_type);
     // TODO might need to eventually handle NullBulkString if we expect clients
     // to send us nils.
   case DataType::Unknown:

@@ -53,10 +53,6 @@ inline DataType byte_to_data_type(char first_byte) {
   switch (first_byte) {
   case '+':
     return DataType::SimpleString;
-  case '-':
-    return DataType::SimpleError;
-  case ':':
-    return DataType::Integer;
   case '$':
     return DataType::BulkString;
   case '*':
@@ -159,7 +155,6 @@ std::string parse_string(const StringType &str, DataType data_type) {
     // Now read the string.
     return std::string(&*iter, num_chars);
   }
-
   case DataType::SimpleString: {
     // Ignore the '+' char.
     ++iter;
@@ -171,6 +166,7 @@ std::string parse_string(const StringType &str, DataType data_type) {
     return std::string(&*iter, terminator_it - iter);
   }
   case DataType::Unknown:
+  case DataType::Array:
   case DataType::SimpleError:
   case DataType::Integer:
   case DataType::NullBulkString:

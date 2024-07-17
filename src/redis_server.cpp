@@ -8,13 +8,12 @@
 #include <unistd.h>
 
 // Our library's header includes.
-#include "network.hpp"
 #include "redis_core.hpp"
 #include "storage.hpp"
 
 namespace {
 
-void handle_client_connection(const int client_fd, const Config &config,
+void handle_client_connection(const SocketFd client_fd, const Config &config,
                               Cache &cache) {
   // For a client, parse each incoming request, process the request, generate a
   // response to the request, and send the response back to the client. Do this
@@ -27,11 +26,12 @@ void handle_client_connection(const int client_fd, const Config &config,
     // time, which results in one response.
     const auto request = receive_string_from_client(client_fd);
     if (!request) {
-      std::cout << "Closing connection with " << client_fd << std::endl;
+      std::cout << "Closing connection with " << static_cast<int>(client_fd)
+                << std::endl;
       break;
     }
-    std::cout << "Parsing request from client " << client_fd << ": " << *request
-              << std::endl;
+    std::cout << "Parsing request from client " << static_cast<int>(client_fd)
+              << ": " << *request << std::endl;
 
     const auto request_message = message_from_string(*request);
     std::cout << "Interpreting request as message: "
@@ -138,7 +138,7 @@ void Server::run() {
       // attempt to copy the cache (which is a move-only type due to the mutex).
       // NOTE: passing the config_ is thread-safe because we never modify it,
       // just read from it.
-      const int client_fd = await_client_connection(*socket_fd_);
+      const auto client_fd = await_client_connection(*socket_fd_);
       futures_.push_back(std::async(std::launch::async,
                                     handle_client_connection, client_fd,
                                     std::cref(config_), std::ref(cache_)));
@@ -159,6 +159,6 @@ Server::~Server() {
   }
 
   if (socket_fd_) {
-    close(*socket_fd_);
+    close(static_cast<int>(*socket_fd_));
   }
 }
