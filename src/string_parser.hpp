@@ -133,6 +133,7 @@ std::vector<std::string> tokenize_array(const StringType &str) {
     case DataType::Map:
     case DataType::Set:
     case DataType::Push:
+    default:
       std::cerr << "Unable to tokenize array for given str: " << str
                 << std::endl;
       std::terminate();
@@ -169,6 +170,19 @@ std::string parse_string(const StringType &str, DataType data_type) {
     advance_to_next_terminator(terminator_it);
     return std::string(&*iter, terminator_it - iter);
   }
+  case DataType::Unknown:
+  case DataType::SimpleError:
+  case DataType::Integer:
+  case DataType::NullBulkString:
+  case DataType::Null:
+  case DataType::Boolean:
+  case DataType::Double:
+  case DataType::BigNumber:
+  case DataType::BulkError:
+  case DataType::VerbatimString:
+  case DataType::Map:
+  case DataType::Set:
+  case DataType::Push:
   default:
     std::cerr << "Unable to parse_string for given str: " << str << std::endl;
     std::terminate();

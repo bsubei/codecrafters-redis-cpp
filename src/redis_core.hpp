@@ -54,8 +54,21 @@ Message message_from_string(const StringType &str) {
     // Create a Message that contains the vector of Messages.
     return Message(std::move(message_data), data_type);
   }
-  // TODO might need to eventually handle NullBulkString if we expect clients to
-  // send us nils.
+    // TODO might need to eventually handle NullBulkString if we expect clients
+    // to send us nils.
+  case DataType::Unknown:
+  case DataType::SimpleError:
+  case DataType::Integer:
+  case DataType::NullBulkString:
+  case DataType::Null:
+  case DataType::Boolean:
+  case DataType::Double:
+  case DataType::BigNumber:
+  case DataType::BulkError:
+  case DataType::VerbatimString:
+  case DataType::Map:
+  case DataType::Set:
+  case DataType::Push:
   default:
     std::cerr << "message_from_string unimplemented for data_type "
               << static_cast<int>(data_type) << ", was given string: " << str

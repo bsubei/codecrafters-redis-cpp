@@ -32,7 +32,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
 - [ ] figure out a way to fix false-positives in msan (need to build and instrument my own libc, see [here](https://clang.llvm.org/docs/MemorySanitizer.html#handling-external-code)).
     - Can probably ditch msan and just use valgrind.
 - [x] install and start using clang-tidy (part of clangd in vscode) as well as clang static analyzer and cppcheck (part of codechecker in vscode).
-- [ ] clean up all the warnings and errors from the above static analysis tools.
+- [x] clean up all the warnings and errors from the above static analysis tools.
 
 # Progress Log
 
