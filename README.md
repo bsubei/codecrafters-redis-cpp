@@ -34,6 +34,7 @@ The codecrafters CLI is primarily how the program is tested. You can also use th
     - Can probably ditch msan and just use valgrind.
 - [x] install and start using clang-tidy (part of clangd in vscode) as well as clang static analyzer and cppcheck (part of codechecker in vscode).
 - [x] clean up all the warnings and errors from the above static analysis tools.
+- [ ] write out RDB file
 
 # Progress Log
 
@@ -64,3 +65,8 @@ Finished reading basic RDB. Things I skipped:
 - All encodings except for length-prefixed string and IntAsString.
 - Actually checking the CRC against the data I'm reading.
 - Parsing wildcard in GET and CONFIG GET commands.
+
+I'm surprised it didnt ask me to implement writing out an RDB file. I should probably implement that.
+
+## Replication
+Will work on replication to allow for a master and replicas to work together.
